@@ -1,0 +1,22 @@
+name: Microservice Build Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+    
+jobs:
+  build-and-deploy:
+    # Point this to your central hub repository
+    uses: rsp777/deployment-workflows/.github/workflows/maven-build.yml@main
+    permissions:
+      contents: write        # Allow pushing commits/tags
+      packages: write        # Allow publishing packages
+    # 1. 'with' is used for public strings and GitHub context variables
+    with:
+      USERNAME: ${{ github.actor }}
+      
+    # 2. 'secrets' is used ONLY for secure tokens
+    secrets:
+      PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      REPO_URL: ${{ secrets.REPO_URL }}
+      REPO_NAME: ${{ secrets.REPO_NAME }}
