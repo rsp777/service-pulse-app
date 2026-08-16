@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Server Manager UI</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Application Start</h1>
+        <form>
+            <div class="form-group">
+                <label for="appName">Application Name:</label>
+                <input type="text" id="appName" name="appName" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-primary">Restart</button>
+        </form>
+        <div id="result"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $("form").submit(function(event) {
+                event.preventDefault();
+                var appName = $("#appName").val();
+                $.post("/api/start/"+appName , function(data) {
+                    $("#result").text(data);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
