@@ -387,6 +387,10 @@
             <article class="card">
               <h2>SSH command</h2>
               <form id="command-form">
+                <label for="command-select">Configured command</label>
+                <select id="command-select">
+                  <option value="">Custom command</option>
+                </select>
                 <label for="command">Command</label
                 ><textarea
                   id="command"
@@ -401,9 +405,9 @@
                 <h2>Services</h2>
                 <div class="actions">
                   <button class="btn secondary" id="refresh-services">Refresh</button>
-                  <button class="btn secondary" id="start-all-services">Start All</button>
-                  <button class="btn secondary" id="stop-all-services">Stop All</button>
-                  <button class="btn secondary" id="restart-all-services">Restart All</button>
+                  <button class="btn secondary" id="start-all-services" hidden>Start All</button>
+                  <button class="btn secondary" id="stop-all-services" hidden>Stop All</button>
+                  <button class="btn secondary" id="restart-all-services" hidden>Restart All</button>
                 </div>
               </div>
               <div id="service-list">Select a server to load services.</div>
@@ -700,6 +704,18 @@
           try { await request(`api/scripts/${id}`, { method: "DELETE" }); await loadSettings(); notice("Script deleted."); } catch (error) { notice(error.message, true); }
         };
         const renderCommands = (commands) => {
+          const commandSelect = $("command-select");
+          const selectedCommand = commandSelect.value;
+          commandSelect.innerHTML =
+            `<option value="">Custom command</option>${commands
+              .map(
+                (command) =>
+                  `<option value="${command.id}">${escapeHtml(command.description || command.name)}</option>`,
+              )
+              .join("")}`;
+          if (commands.some((command) => String(command.id) === selectedCommand)) {
+            commandSelect.value = selectedCommand;
+          }
           $("command-table").innerHTML = commands.length
             ? commands
                 .map(
@@ -867,6 +883,10 @@
         const loadServices = async () => {
           if (!state.selected) return;
           const services = state.selected.services || [];
+          const showBulkActions = services.length > 1;
+          ["start-all-services", "stop-all-services", "restart-all-services"].forEach(
+            (buttonId) => ($(buttonId).hidden = !showBulkActions),
+          );
           $("service-list").innerHTML = services.length
             ? services
                 .map(
@@ -1044,6 +1064,14 @@
           } catch (error) {
             notice(error.message, true);
           }
+        };
+        $("command-select").onchange = (event) => {
+          const command = state.commands.find(
+            (item) => String(item.id) === event.target.value,
+          );
+          $("command").value = command
+            ? [command.name, command.parameters].filter(Boolean).join(" ")
+            : "";
         };
         $("add-command").onclick = () => openCommand();
         $("refresh-commands").onclick = loadCommands;
@@ -1305,6 +1333,7 @@
               })[character],
           );
         loadServers();
+        loadCommands();
       })();
     </script>
   </body>
