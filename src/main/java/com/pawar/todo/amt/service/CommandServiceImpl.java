@@ -170,26 +170,32 @@ public class CommandServiceImpl implements CommandService {
     }
 
     @Override
-    public Optional<CommandResponseDto> findCommandByDescription(String description) throws CommandOperationException {
+    public Optional<CommandResponseDto> findCommand(String nameOrDescription) throws CommandOperationException {
         try {
-            logger.debug("Fetching command by description: {}", description);
-            return commandCache.get(description)
+            logger.debug("Fetching command by name or description: {}", nameOrDescription);
+            return commandCache.get(nameOrDescription)
                     .or(() -> {
                         try {
-                            Command command = commandRepository.findByDescription(description)
+                            Command command = commandRepository.findFirstByNameOrDescription(nameOrDescription,
+                                    nameOrDescription)
                                     .orElseThrow(() -> new ResourceNotFoundException(
-                                            "Command not found with description: " + description));
+                                            "Command not found: " + nameOrDescription));
                             CommandResponseDto dto = commandMapper.toDto(command);
-                            commandCache.put(description, dto);
+                            commandCache.put(nameOrDescription, dto);
                             return Optional.of(dto);
                         } catch (ResourceNotFoundException e) {
-                            logger.error("Error fetching service with ID: {}", description, e);
+                            logger.error("Error fetching command: {}", nameOrDescription, e);
                             return Optional.empty(); // Return empty if not found
                         }
                     });
         } catch (Exception e) {
-            logger.error("Error fetching command with description: {}", description, e);
+            logger.error("Error fetching command: {}", nameOrDescription, e);
             throw new CommandOperationException("Failed to fetch command", e);
         }
+    }
+
+    @Override
+    public Optional<CommandResponseDto> findCommandByDescription(String description) throws CommandOperationException {
+        return findCommand(description);
     }
 }

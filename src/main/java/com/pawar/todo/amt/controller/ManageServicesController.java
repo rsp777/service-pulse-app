@@ -9,21 +9,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.SendTo;
-import org.springframework.stereotype.Controller;
+
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.socket.TextMessage;
 
-import com.pawar.app.healthcheck.dto.CommandResponseDto;
-import com.pawar.todo.amt.constants.CommandResult;
 import com.pawar.todo.amt.response.ApiResponse;
 import com.pawar.todo.amt.service.ManageServices;
-import com.pawar.todo.amt.service.WebSocketAgentService;
 
 @RestController
 @RequestMapping("/api/manage-services")
@@ -41,12 +35,11 @@ public class ManageServicesController {
 	}
 
 	@PostMapping("/start-service")
-	public ResponseEntity<ApiResponse<TextMessage>> startService(@RequestParam Integer agentId,
+	public ResponseEntity<ApiResponse<TextMessage>> startService(@RequestParam Integer serverId,
 			@RequestParam Integer serviceId) {
 		try {
-			String responseMessage = manageServices.startService(agentId, serviceId);
-			TextMessage response = waitForResponse();
-			responseFuture = new CompletableFuture<>();
+			String responseMessage = manageServices.startService(serverId, serviceId);
+			TextMessage response = new TextMessage(responseMessage);
 			logger.info("responseMessage : {}", responseMessage);
 			return ResponseEntity.ok(new ApiResponse<>(true, responseMessage, response));
 
@@ -62,12 +55,11 @@ public class ManageServicesController {
 	}
 
 	@PostMapping("/stop-service")
-	public ResponseEntity<ApiResponse<TextMessage>> stopService(@RequestParam Integer agentId,
+	public ResponseEntity<ApiResponse<TextMessage>> stopService(@RequestParam Integer serverId,
 			@RequestParam Integer serviceId) {
 		try {
-			String responseMessage = manageServices.stopService(agentId, serviceId);
-			TextMessage response = waitForResponse();
-			responseFuture = new CompletableFuture<>();
+			String responseMessage = manageServices.stopService(serverId, serviceId);
+			TextMessage response = new TextMessage(responseMessage);
 			logger.info("responseMessage : {}", responseMessage);
 			return ResponseEntity.ok(new ApiResponse<>(true, responseMessage, response));
 
@@ -83,11 +75,10 @@ public class ManageServicesController {
 	}
 
 	@PostMapping("/start-all-service")
-	public ResponseEntity<ApiResponse<TextMessage>> startAllServices(@RequestParam Integer agentId) {
+	public ResponseEntity<ApiResponse<TextMessage>> startAllServices(@RequestParam Integer serverId) {
 		try {
-			String responseMessage = manageServices.startAllServices(agentId);
-			TextMessage response = waitForResponse();
-			responseFuture = new CompletableFuture<>();
+			String responseMessage = manageServices.startAllServices(serverId);
+			TextMessage response = new TextMessage(responseMessage);
 			logger.info("responseMessage : {}", responseMessage);
 			return ResponseEntity.ok(new ApiResponse<>(true, responseMessage, response));
 
@@ -103,11 +94,10 @@ public class ManageServicesController {
 	}
 
 	@PostMapping("/stop-all-service")
-	public ResponseEntity<ApiResponse<TextMessage>> stopAllServices(@RequestParam Integer agentId) {
+	public ResponseEntity<ApiResponse<TextMessage>> stopAllServices(@RequestParam Integer serverId) {
 		try {
-			String responseMessage = manageServices.stopAllServices(agentId);
-			TextMessage response = waitForResponse();
-			responseFuture = new CompletableFuture<>();
+			String responseMessage = manageServices.stopAllServices(serverId);
+			TextMessage response = new TextMessage(responseMessage);
 			logger.info("responseMessage : {}", responseMessage);
 			return ResponseEntity.ok(new ApiResponse<>(true, responseMessage, response));
 
@@ -119,6 +109,18 @@ public class ManageServicesController {
 			logger.error("Error getting api response: {}", e.getMessage(), e);
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body(new ApiResponse<>(false, "Failed to get api response: " + e.getMessage(), null));
+		}
+	}
+
+	@PostMapping("/restart-all-service")
+	public ResponseEntity<ApiResponse<String>> restartAllServices(@RequestParam Integer serverId) {
+		try {
+			String responseMessage = manageServices.restartAllServices(serverId);
+			return ResponseEntity.ok(new ApiResponse<>(true, responseMessage, responseMessage));
+		} catch (Exception exception) {
+			logger.error("Error restarting all services", exception);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(new ApiResponse<>(false, "Failed to restart services: " + exception.getMessage(), null));
 		}
 	}
 

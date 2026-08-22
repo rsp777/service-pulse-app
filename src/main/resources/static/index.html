@@ -1,33 +1,1294 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <title>Server Manager UI</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Application Start</h1>
-        <form>
-            <div class="form-group">
-                <label for="appName">Application Name:</label>
-                <input type="text" id="appName" name="appName" class="form-control">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Service Pulse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #17212b;
+        --muted: #64717d;
+        --line: #dce3e8;
+        --paper: #f5f7f8;
+        --card: #fff;
+        --accent: #0e7490;
+        --accent-dark: #075985;
+        --ok: #18794e;
+        --bad: #b42318;
+        --warn: #a16207;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          15px/1.5 "DM Sans",
+          sans-serif;
+      }
+      .app {
+        display: flex;
+        min-height: 100vh;
+      }
+      .sidebar {
+        width: 245px;
+        background: #12343b;
+        color: #fff;
+        padding: 24px 0;
+        flex: none;
+      }
+      .brand {
+        padding: 0 22px 25px;
+        border-bottom: 1px solid #ffffff26;
+      }
+      .brand h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      .brand p {
+        color: #b8d4d8;
+        margin: 4px 0 0;
+        font-size: 12px;
+      }
+      .nav {
+        padding-top: 20px;
+      }
+      .nav button {
+        display: block;
+        width: 100%;
+        padding: 13px 22px;
+        border: 0;
+        border-left: 3px solid transparent;
+        background: transparent;
+        color: #c7d9dc;
+        text-align: left;
+        cursor: pointer;
+      }
+      .nav button.active,
+      .nav button:hover {
+        background: #ffffff12;
+        border-left-color: #55c2cf;
+        color: #fff;
+      }
+      .main {
+        flex: 1;
+        padding: 30px;
+        min-width: 0;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+      .header h2 {
+        margin: 0;
+        font-size: 26px;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: stretch;
+        gap: 12px;
+      }
+      .btn {
+        border: 0;
+        border-radius: 5px;
+        padding: 9px 13px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn:hover {
+        background: var(--accent-dark);
+      }
+      .btn.secondary {
+        background: #e8eef0;
+        color: var(--ink);
+      }
+      .btn.danger {
+        background: #a53a32;
+      }
+      .panel,
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px #17313d0d;
+      }
+      .panel {
+        padding: 18px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .card {
+        padding: 18px;
+      }
+      .full {
+        grid-column: 1/-1;
+      }
+      .server-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 16px;
+      }
+      .server-item {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+      }
+      .server-item.active {
+        border-color: var(--accent);
+        box-shadow: inset 3px 0 var(--accent);
+      }
+      .server-item strong,
+      .server-item small {
+        display: block;
+      }
+      .server-item small,
+      label {
+        color: var(--muted);
+      }
+      label {
+        display: block;
+        margin: 11px 0 4px;
+        font-size: 13px;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 9px 10px;
+        border: 1px solid #c8d2d8;
+        border-radius: 5px;
+        background: #fff;
+        color: var(--ink);
+      }
+      textarea {
+        min-height: 92px;
+        resize: vertical;
+      }
+      .service {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .service:last-child {
+        border: 0;
+      }
+      .service small {
+        display: block;
+        color: var(--muted);
+      }
+      .actions {
+        white-space: nowrap;
+      }
+      .status {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 10px;
+        font-size: 12px;
+        background: #e5f3ec;
+        color: var(--ok);
+      }
+      .status.offline {
+        background: #fce9e7;
+        color: var(--bad);
+      }
+      #notice {
+        min-height: 25px;
+        margin-bottom: 10px;
+        color: var(--muted);
+      }
+      #notice.error {
+        color: var(--bad);
+      }
+      #output {
+        white-space: pre-wrap;
+        overflow: auto;
+        max-height: 300px;
+        background: #17212b;
+        color: #d9eef0;
+        padding: 14px;
+        border-radius: 5px;
+      }
+      .page {
+        display: none;
+      }
+      .page.active {
+        display: block;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #0008;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        z-index: 2;
+      }
+      .modal.active {
+        display: flex;
+      }
+      .modal-content {
+        background: #fff;
+        border-radius: 8px;
+        width: (560px, 100%);
+        max-height: 90vh;
+        overflow: auto;
+        padding: 22px;
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-header h3 {
+        margin: 0;
+      }
+      .close {
+        border: 0;
+        background: transparent;
+        font-size: 24px;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      .context {
+        display: none;
+        position: fixed;
+        background: #fff;
+        border: 1px solid var(--line);
+        box-shadow: 0 6px 20px #17313d33;
+        z-index: 3;
+      }
+      .context.active {
+        display: block;
+      }
+      .context button {
+        display: block;
+        width: 150px;
+        border: 0;
+        background: #fff;
+        padding: 10px;
+        text-align: left;
+        cursor: pointer;
+      }
+      .context button:hover {
+        background: #edf7f8;
+      }
+      @media (max-width: 800px) {
+        .app {
+          display: block;
+        }
+        .sidebar {
+          width: auto;
+          padding: 14px;
+        }
+        .brand {
+          padding: 0 8px 12px;
+        }
+        .nav {
+          display: flex;
+          padding: 10px 0 0;
+          gap: 5px;
+        }
+        .nav button {
+          padding: 9px;
+          border: 0;
+          text-align: center;
+        }
+        .main {
+          padding: 18px;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .full {
+          grid-column: auto;
+        }
+        .header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        #logs-output,
+        #output,
+        .logs-container {
+          white-space: pre-wrap; /* Forces text to respect newlines AND wrap */
+          word-break: break-all; /* Prevents long strings from breaking the modal */
+          overflow-x: hidden;
+          background: #17212b;
+          color: #d9eef0;
+          padding: 14px;
+          border-radius: 5px;
+          margin: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>Service Pulse</h1>
+          <p>Agentless Linux operations</p>
+        </div>
+        <nav class="nav">
+          <button class="active" data-page="dashboard">Dashboard</button
+          ><button data-page="servers">Servers</button
+          ><button data-page="commands">Commands</button
+          ><button data-page="settings">Settings</button>
+        </nav>
+      </aside>
+      <main class="main">
+        <div id="notice" role="status"></div>
+        <section id="dashboard" class="page active">
+          <div class="header">
+            <h2>Service Health Dashboard</h2>
+            <div>
+              <button class="btn" id="add-server">+ Add server</button
+              ><button class="btn" id="add-service">+ Add service</button>
             </div>
-            <button type="submit" class="btn btn-primary">Restart</button>
-        </form>
-        <div id="result"></div>
+          </div>
+          <div class="grid">
+            <article class="card">
+              <h2 id="selected-title">Select a server</h2>
+              <p id="selected-meta">Choose a server to manage its services.</p>
+              <label for="server-select">Server</label
+              ><select id="server-select">
+                <option value="">-- Select a server --</option>
+              </select>
+            </article>
+            <article class="card">
+              <h2>SSH command</h2>
+              <form id="command-form">
+                <label for="command">Command</label
+                ><textarea
+                  id="command"
+                  required
+                  placeholder="systemctl status nginx"
+                ></textarea
+                ><button class="btn" type="submit">Run command</button>
+              </form>
+            </article>
+            <article class="card full">
+              <div class="toolbar">
+                <h2>Services</h2>
+                <div class="actions">
+                  <button class="btn secondary" id="refresh-services">Refresh</button>
+                  <button class="btn secondary" id="start-all-services">Start All</button>
+                  <button class="btn secondary" id="stop-all-services">Stop All</button>
+                  <button class="btn secondary" id="restart-all-services">Restart All</button>
+                </div>
+              </div>
+              <div id="service-list">Select a server to load services.</div>
+            </article>
+            <article class="card full">
+              <h2>Command output</h2>
+              <pre id="output">No command run.</pre>
+            </article>
+          </div>
+        </section>
+        <section id="servers" class="page">
+          <div class="header">
+            <h2>Manage Servers</h2>
+            <button class="btn" id="add-server-page">+ Add server</button>
+          </div>
+          <div class="card" id="server-table"></div>
+        </section>
+        <section id="commands" class="page">
+          <div class="header">
+            <h2>Manage Commands</h2>
+            <button class="btn" id="add-command">+ Add command</button>
+          </div>
+          <div class="card">
+            <div class="toolbar">
+              <p>Commands are executed through SSH on the selected server.</p>
+              <button class="btn secondary" id="refresh-commands">
+                Refresh
+              </button>
+            </div>
+            <div id="command-table">Loading commands...</div>
+          </div>
+        </section>
+        <section id="settings" class="page">
+          <div class="header"><h2>Settings</h2></div>
+          <div class="card">
+            <p>
+              SSH keys and known hosts are configured on the application server
+              through environment-backed properties. Private keys are never
+              stored in this browser or in server records.
+            </p>
+          </div>
+          <div class="grid">
+            <article class="card">
+              <div class="toolbar"><h2>Paths</h2><button class="btn" id="add-path">+ Add path</button></div>
+              <div id="path-table">Loading paths...</div>
+            </article>
+            <article class="card">
+              <div class="toolbar"><h2>Scripts</h2><button class="btn" id="add-script">+ Add script</button></div>
+              <div id="script-table">Loading scripts...</div>
+            </article>
+          </div>
+        </section>
+      </main>
     </div>
-
-    <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+    <div class="modal" id="server-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Server</h3>
+          <button class="close" data-close="server-modal">&times;</button>
+        </div>
+        <form id="server-form">
+          <input type="hidden" id="server-id" /><label for="hostname"
+            >Name</label
+          ><input id="hostname" required placeholder="prod-web-01" /><label
+            for="ip-address"
+            >Hostname or IP</label
+          ><input id="ip-address" required /><label for="os-type">OS</label
+          ><input id="os-type" value="Linux" /><label for="server-status"
+            >Status</label
+          ><select id="server-status">
+            <option>ONLINE</option>
+            <option>OFFLINE</option>
+            <option>UNKNOWN</option>
+          </select>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn secondary"
+              data-close="server-modal"
+            >
+              Cancel</button
+            ><button class="btn" type="submit">Save server</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal" id="service-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Service</h3>
+          <button class="close" data-close="service-modal">&times;</button>
+        </div>
+        <form id="service-form">
+          <input type="hidden" id="service-id" />
+          <label for="service-server">Server</label
+          ><select id="service-server" required></select
+          ><label for="service-name">Service name</label
+          ><input id="service-name" required /><label for="service-type"
+            >Service type</label
+          ><select id="service-type">
+            <option value="SPRING_BOOT">Spring Boot</option>
+            <option value="OTHER">Other</option></select
+          ><label for="logs-path">LOGS path</label
+          ><input id="logs-path" placeholder="/opt/apps/logs" /><label
+            for="scripts-path"
+            >Scripts path</label
+          ><input id="scripts-path" placeholder="/opt/apps/scripts" />
+          <div id="spring-boot-fields">
+            <label for="actuator-port">Actuator port</label
+            ><input
+              id="actuator-port"
+              type="number"
+              value="8080"
+              min="1"
+              max="65535"
+            /><label for="context-path">Context path</label
+            ><input id="context-path" placeholder="/inventory-management-app" />
+            <p>
+              <small
+                >Health and info URLs are generated automatically for Spring
+                Boot services.</small
+              >
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn secondary"
+              data-close="service-modal"
+            >
+              Cancel</button
+            ><button class="btn" type="submit">Save service</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal" id="logs-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Service logs</h3>
+          <button class="close" data-close="logs-modal">&times;</button>
+        </div>
+        <pre id="logs-output">No logs loaded.</pre>
+      </div>
+    </div>
+    <div class="modal" id="command-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Command</h3>
+          <button class="close" data-close="command-modal">&times;</button>
+        </div>
+        <form id="command-crud-form">
+          <input type="hidden" id="command-id" />
+          <label for="command-name">Name</label>
+          <input id="command-name" required placeholder="tail" />
+          <label for="command-description">Description</label>
+          <input id="command-description" required placeholder="StreamLogs" />
+          <label for="command-parameters">Parameters</label>
+          <input id="command-parameters" placeholder="-n 100 -F" />
+          <label for="command-status">Status</label>
+          <select id="command-status">
+            <option>CREATED</option>
+            <option>PENDING</option>
+            <option>IN_PROGRESS</option>
+            <option>COMPLETED</option>
+            <option>FAILED</option>
+          </select>
+          <label for="command-result">Result</label>
+          <textarea
+            id="command-result"
+            placeholder="Optional execution result"
+          ></textarea>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn secondary"
+              data-close="command-modal"
+            >
+              Cancel
+            </button>
+            <button class="btn" type="submit">Save command</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal" id="path-modal"><div class="modal-content"><div class="modal-header"><h3>Path</h3><button class="close" data-close="path-modal">&times;</button></div><form id="path-crud-form"><input type="hidden" id="path-id"><label for="path-name">Name</label><input id="path-name" required placeholder="LOGS_HOME"><label for="path-description">Filesystem path</label><input id="path-description" required placeholder="/opt/apps/logs"><label for="path-server">Server</label><select id="path-server" required></select><div class="modal-footer"><button type="button" class="btn secondary" data-close="path-modal">Cancel</button><button class="btn" type="submit">Save path</button></div></form></div></div>
+    <div class="modal" id="script-modal"><div class="modal-content"><div class="modal-header"><h3>Script</h3><button class="close" data-close="script-modal">&times;</button></div><form id="script-crud-form"><input type="hidden" id="script-id"><label for="script-name">Name</label><input id="script-name" required placeholder="start"><label for="script-extension">Extension</label><select id="script-extension"><option value="SH">SH</option><option value="BASH">BASH</option><option value="BAT">BAT</option></select><div class="modal-footer"><button type="button" class="btn secondary" data-close="script-modal">Cancel</button><button class="btn" type="submit">Save script</button></div></form></div></div>
+    <div class="context" id="context">
+      <button data-action="logs">View logs</button
+      ><button data-action="start">Start service</button
+      ><button data-action="stop">Stop service</button
+      ><button data-action="details">View details</button>
+    </div>
     <script>
-        $(document).ready(function() {
-            $("form").submit(function(event) {
-                event.preventDefault();
-                var appName = $("#appName").val();
-                $.post("/api/start/"+appName , function(data) {
-                    $("#result").text(data);
-                });
+      (() => {
+        const state = {
+          servers: [],
+          selected: null,
+          service: null,
+          commands: [],
+          paths: [],
+          scripts: [],
+        };
+        let currentLogStream = null;
+        const $ = (id) => document.getElementById(id);
+        const unwrap = (value) => value?.data ?? value;
+        const notice = (text, error = false) => {
+          $("notice").textContent = text;
+          $("notice").className = error ? "error" : "";
+        };
+        const request = async (path, options = {}) => {
+          const response = await fetch(path, {
+            headers: { "Content-Type": "application/json" },
+            ...options,
+          });
+          if (!response.ok)
+            throw new Error(
+              (await response.text()) || `${response.status} request failed`,
+            );
+          return response.status === 204 ? null : response.json();
+        };
+        const showPage = (page) => {
+          document
+            .querySelectorAll(".page")
+            .forEach((item) =>
+              item.classList.toggle("active", item.id === page),
+            );
+          document
+            .querySelectorAll(".nav button")
+            .forEach((item) =>
+              item.classList.toggle("active", item.dataset.page === page),
+            );
+          if (page === "servers") renderServerTable();
+          if (page === "commands") loadCommands();
+          if (page === "settings") loadSettings();
+        };
+        const loadSettings = async () => {
+          try {
+            state.paths = unwrap(await request("api/paths")) || [];
+            state.scripts = unwrap(await request("api/scripts")) || [];
+            renderPaths();
+            renderScripts();
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        const renderPaths = () => {
+          $("path-table").innerHTML = state.paths.length
+            ? state.paths.map((path) => `<div class="service" data-path-id="${path.id}"><span><strong>${escapeHtml(path.pathName)}</strong><small>${escapeHtml(path.pathDescription || "")}</small></span><span class="actions"><button class="btn secondary" data-path-action="edit">Edit</button><button class="btn danger" data-path-action="delete">Delete</button></span></div>`).join("")
+            : "No paths configured.";
+          document.querySelectorAll("[data-path-action]").forEach((button) => {
+            const id = Number(button.closest("[data-path-id]").dataset.pathId);
+            button.onclick = () => button.dataset.pathAction === "edit" ? openPath(id) : deletePath(id);
+          });
+        };
+        const renderScripts = () => {
+          $("script-table").innerHTML = state.scripts.length
+            ? state.scripts.map((script) => `<div class="service" data-script-id="${script.id}"><span><strong>${escapeHtml(script.scriptName)}</strong><small>${escapeHtml(script.scriptExtension || "")}</small></span><span class="actions"><button class="btn secondary" data-script-action="edit">Edit</button><button class="btn danger" data-script-action="delete">Delete</button></span></div>`).join("")
+            : "No scripts configured.";
+          document.querySelectorAll("[data-script-action]").forEach((button) => {
+            const id = Number(button.closest("[data-script-id]").dataset.scriptId);
+            button.onclick = () => button.dataset.scriptAction === "edit" ? openScript(id) : deleteScript(id);
+          });
+        };
+        const openPath = (id = null) => {
+          $("path-crud-form").reset();
+          $("path-id").value = id || "";
+          $("path-server").innerHTML = state.servers.map((server) => `<option value="${server.id}">${escapeHtml(server.hostname || server.ipAddress)}</option>`).join("");
+          if (id) {
+            const path = state.paths.find((item) => item.id === id);
+            if (!path) return notice("Path not found.", true);
+            $("path-name").value = path.pathName || "";
+            $("path-description").value = path.pathDescription || "";
+          } else if (state.selected) $("path-server").value = state.selected.id;
+          $("path-modal").classList.add("active");
+        };
+        const openScript = (id = null) => {
+          $("script-crud-form").reset();
+          $("script-id").value = id || "";
+          if (id) {
+            const script = state.scripts.find((item) => item.id === id);
+            if (!script) return notice("Script not found.", true);
+            $("script-name").value = script.scriptName || "";
+            $("script-extension").value = script.scriptExtension || "SH";
+          }
+          $("script-modal").classList.add("active");
+        };
+        const deletePath = async (id) => {
+          if (!window.confirm("Delete this path?")) return;
+          try { await request(`api/paths/${id}`, { method: "DELETE" }); await loadSettings(); notice("Path deleted."); } catch (error) { notice(error.message, true); }
+        };
+        const deleteScript = async (id) => {
+          if (!window.confirm("Delete this script?")) return;
+          try { await request(`api/scripts/${id}`, { method: "DELETE" }); await loadSettings(); notice("Script deleted."); } catch (error) { notice(error.message, true); }
+        };
+        const renderCommands = (commands) => {
+          $("command-table").innerHTML = commands.length
+            ? commands
+                .map(
+                  (command) =>
+                    `<div class="service" data-command-id="${command.id}"><span><strong>${escapeHtml(command.name)}</strong><small>${escapeHtml(command.description || "")}</small><small>Parameters: ${escapeHtml(command.parameters || "(none)")} · Status: ${escapeHtml(command.status || "UNKNOWN")}</small></span><span class="actions"><button class="btn secondary" data-command-action="edit">Edit</button><button class="btn danger" data-command-action="delete">Delete</button></span></div>`,
+                )
+                .join("")
+            : "No commands configured.";
+          document
+            .querySelectorAll("[data-command-action]")
+            .forEach((button) => {
+              const commandId = Number(
+                button.closest("[data-command-id]").dataset.commandId,
+              );
+              button.onclick = () =>
+                button.dataset.commandAction === "edit"
+                  ? openCommand(commandId)
+                  : deleteCommand(commandId);
             });
+        };
+        const loadCommands = async () => {
+          try {
+            const commands = unwrap(await request("api/commands")) || [];
+            state.commands = commands;
+            renderCommands(commands);
+          } catch (error) {
+            $("command-table").textContent = "Unable to load commands.";
+            notice(error.message, true);
+          }
+        };
+        const openCommand = (id = null) => {
+          $("command-crud-form").reset();
+          $("command-id").value = id || "";
+          if (id) {
+            const command = state.commands.find((item) => item.id === id);
+            if (!command) return notice("Command not found.", true);
+            $("command-name").value = command.name || "";
+            $("command-description").value = command.description || "";
+            $("command-parameters").value = command.parameters || "";
+            $("command-status").value = command.status || "CREATED";
+            $("command-result").value = command.result || "";
+          } else {
+            $("command-status").value = "CREATED";
+          }
+          $("command-modal").classList.add("active");
+        };
+        const deleteCommand = async (id) => {
+          if (!window.confirm("Delete this command?")) return;
+          try {
+            await request(`api/commands/${id}`, { method: "DELETE" });
+            await loadCommands();
+            notice("Command deleted.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        const renderServers = () => {
+          const options = state.servers
+            .map(
+              (server) =>
+                `<option value="${server.id}">${escapeHtml(server.hostname || server.ipAddress)}</option>`,
+            )
+            .join("");
+          $("server-select").innerHTML =
+            `<option value="">-- Select a server --</option>${options}`;
+          $("service-server").innerHTML =
+            `<option value="">-- Select a server --</option>${options}`;
+          $("server-list")?.replaceChildren();
+          renderServerTable();
+        };
+        const renderServerTable = () => {
+          $("server-table").innerHTML =
+            state.servers
+              .map(
+                (server) =>
+                  `<div class="service"><span><strong>${escapeHtml(server.hostname || server.ipAddress)}</strong><small>${escapeHtml(server.ipAddress || "")} · ${escapeHtml(server.status || "UNKNOWN")}</small></span><span class="actions"><button class="btn secondary" data-server="${server.id}">Select</button><button class="btn secondary" data-edit-server="${server.id}">Edit</button><button class="btn secondary" data-delete-server="${server.id}">Delete</button></span></div>`,
+              )
+              .join("") || "No servers configured.";
+          document
+            .querySelectorAll("[data-server]")
+            .forEach(
+              (button) =>
+                (button.onclick = () =>
+                  selectServer(Number(button.dataset.server))),
+            );
+          document.querySelectorAll("[data-edit-server]").forEach(
+            (button) =>
+              (button.onclick = () => openServer(Number(button.dataset.editServer))),
+          );
+          document.querySelectorAll("[data-delete-server]").forEach(
+            (button) =>
+              (button.onclick = () => deleteServer(Number(button.dataset.deleteServer))),
+          );
+        };
+        const deleteServer = async (id) => {
+          if (!window.confirm("Delete this server?")) return;
+          try {
+            await request(`api/servers/${id}`, { method: "DELETE" });
+            if (state.selected?.id === id) state.selected = null;
+            await loadServers();
+            $("service-list").textContent = "Select a server to load services.";
+            notice("Server deleted.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        const loadServers = async () => {
+          try {
+            state.servers = unwrap(await request("api/servers")) || [];
+            renderServers();
+            if (state.selected) selectServer(state.selected.id);
+            notice(`${state.servers.length} server(s) loaded.`);
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        const selectServer = async (id) => {
+          state.selected =
+            state.servers.find((server) => server.id === id) || null;
+          $("server-select").value = state.selected?.id || "";
+          if (!state.selected) return;
+          try {
+            const persisted = unwrap(await request(`api/service-health-status/server/${id}`)) || [];
+            state.healthStatuses = Object.fromEntries(persisted.map((item) => [item.service?.id, item.status]));
+          } catch {
+            state.healthStatuses = {};
+          }
+          $("selected-title").textContent =
+            state.selected.hostname || state.selected.ipAddress;
+          $("selected-meta").textContent =
+            `${state.selected.ipAddress || ""} · ${state.selected.osType || "Linux"}`;
+          await loadServices();
+          renderServers();
+        };
+        const updateServiceRuntime = async (service) => {
+          const version = $(`version-${service.id}`);
+          const indicator = $(`indicator-${service.id}`);
+          if (!service.healthCheckUrl) return;
+          const baseUrl = service.healthCheckUrl.replace(
+            /\/actuator\/health$/,
+            "",
+          );
+          try {
+            const health = await fetch(`${baseUrl}/actuator/health`);
+            indicator.className = `status ${health.ok ? "" : "offline"}`;
+            indicator.style = health.ok ? "" : "";
+            indicator.textContent = health.ok ? "ONLINE" : "OFFLINE";
+            const info = await fetch(`${baseUrl}/actuator/info`);
+            if (info.ok) {
+              const payload = await info.json();
+              version.textContent =
+                payload?.build?.version ||
+                payload?.build?.project?.version ||
+                "Unknown";
+            } else {
+              version.textContent = "Unknown";
+            }
+          } catch {
+            indicator.className = "status offline";
+            indicator.style = "";
+            indicator.textContent = "OFFLINE";
+            version.textContent = "Unknown";
+          }
+        };
+        const loadServices = async () => {
+          if (!state.selected) return;
+          const services = state.selected.services || [];
+          $("service-list").innerHTML = services.length
+            ? services
+                .map(
+                  (service) =>
+                    `<div class="service" data-service-id="${service.id}"><span><strong>${escapeHtml(service.serviceName)}</strong><small>${escapeHtml(service.healthCheckUrl || "")}</small><small>Version: <span id="version-${service.id}">Unknown</span> · <span id="indicator-${service.id}" class="status ${state.healthStatuses[service.id] === "UP" ? "" : state.healthStatuses[service.id] === "DOWN" ? "offline" : "unknown"}" style="${state.healthStatuses[service.id] ? "" : "background:#edf0f2;color:#64717d"}">${escapeHtml(state.healthStatuses[service.id] || "UNKNOWN")}</span></small></span><span class="actions"><button class="btn" data-action="start">Start</button><button class="btn secondary" data-action="stop">Stop</button><button class="btn secondary" data-action="logs">Logs</button><button class="btn secondary" data-edit-service="${service.id}">Edit</button><button class="btn secondary" data-delete-service="${service.id}">Delete</button></span></div>`,
+                )
+                .join("")
+            : "No services are attached to this server.";
+          document
+            .querySelectorAll("[data-action]")
+            .forEach(
+              (button) =>
+                (button.onclick = () =>
+                  serviceAction(
+                    button.dataset.action,
+                    Number(
+                      button.closest("[data-service-id]").dataset.serviceId,
+                    ),
+                  )),
+            );
+          document.querySelectorAll("[data-edit-service]").forEach(
+            (button) =>
+              (button.onclick = () => openService(Number(button.dataset.editService))),
+          );
+          document.querySelectorAll("[data-delete-service]").forEach(
+            (button) =>
+              (button.onclick = () => deleteService(Number(button.dataset.deleteService))),
+          );
+          services.forEach(updateServiceRuntime);
+        };
+        const deleteService = async (id) => {
+          if (!window.confirm("Delete this service?")) return;
+          try {
+            await request(`api/services/${id}`, { method: "DELETE" });
+            await loadServers();
+            await selectServer(state.selected.id);
+            notice("Service deleted.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        const closeLogStream = () => {
+          if (!currentLogStream) return;
+          currentLogStream.close();
+          currentLogStream = null;
+        };
+        window.addEventListener("pagehide", closeLogStream);
+        window.addEventListener("beforeunload", closeLogStream);
+        const streamLogs = (serviceId) => {
+          closeLogStream();
+          const logsOutputEl = $("logs-output");
+          logsOutputEl.textContent = "Connecting...\n";
+          $("logs-modal").classList.add("active");
+          currentLogStream = new EventSource(
+            `api/logs/stream?serverId=${state.selected.id}&serviceId=${serviceId}`,
+          );
+          currentLogStream.addEventListener("log", (event) => {
+            const lines = (logsOutputEl.textContent + event.data + "\n").split(
+              "\n",
+            );
+            logsOutputEl.textContent = lines.slice(-1001).join("\n");
+            logsOutputEl.scrollTop = logsOutputEl.scrollHeight;
+          });
+          currentLogStream.onerror = () => {
+            currentLogStream.close();
+            currentLogStream = null;
+            if (logsOutputEl.textContent === "Connecting...\n") {
+              logsOutputEl.textContent = "Unable to stream logs.";
+            }
+            notice("Log stream disconnected.", true);
+          };
+          notice("Log stream connected.");
+        };
+        const serviceAction = async (action, serviceId) => {
+          if (action === "logs") {
+            streamLogs(serviceId);
+            return;
+          }
+          try {
+            const route = `api/manage-services/${action}-service`;
+
+            const response = await request(
+              `${route}?serverId=${state.selected.id}&serviceId=${serviceId}`,
+              { method: "POST" },
+            );
+
+            const unwrappedResponse = unwrap(response);
+
+            // 1. START AGGRESSIVE PARSING
+            let currentData =
+              unwrappedResponse.payload ||
+              unwrappedResponse.data?.payload ||
+              unwrappedResponse;
+
+            // Keep parsing as long as it's a string (handles double/triple-wrapped JSON)
+            while (typeof currentData === "string") {
+              try {
+                currentData = JSON.parse(currentData);
+              } catch {
+                break; // Stop parsing when it's just normal text
+              }
+            }
+
+            // 2. EXTRACT OUTPUT
+            let finalOutputText = "";
+            if (currentData && currentData.output) {
+              finalOutputText = currentData.output;
+            } else if (typeof currentData === "object") {
+              finalOutputText = JSON.stringify(currentData, null, 2);
+            } else {
+              finalOutputText = String(currentData);
+            }
+
+            // 3. FORCE REAL NEWLINES
+            if (typeof finalOutputText === "string") {
+              finalOutputText = finalOutputText
+                .replace(/\\\\n/g, "\n") // Fix double-escaped newlines
+                .replace(/\\n/g, "\n") // Fix single-escaped newlines
+                .replace(/\\\\r/g, "") // Clean up carriage returns
+                .replace(/\\r/g, "")
+                .replace(/^"|"$/g, ""); // Strip leftover wrapping quotes
+            }
+            // END AGGRESSIVE PARSING
+
+            // Apply to DOM
+            const outputEl = $("output");
+            if (outputEl) {
+              outputEl.textContent = finalOutputText;
+            }
+
+            notice(`${action} request completed.`);
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        const bulkServiceAction = async (action) => {
+          if (!state.selected) return notice("Select a server first.", true);
+          try {
+            const response = await request(
+              `api/manage-services/${action}-all-service?serverId=${state.selected.id}`,
+              { method: "POST" },
+            );
+            $("output").textContent = JSON.stringify(unwrap(response), null, 2);
+            await loadServers();
+            await selectServer(state.selected.id);
+            notice(`${action} all request completed.`);
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        $("server-select").onchange = (event) =>
+          selectServer(Number(event.target.value));
+        $("refresh-services").onclick = loadServices;
+        $("start-all-services").onclick = () => bulkServiceAction("start");
+        $("stop-all-services").onclick = () => bulkServiceAction("stop");
+        $("restart-all-services").onclick = () => bulkServiceAction("restart");
+        $("command-form").onsubmit = async (event) => {
+          event.preventDefault();
+          if (!state.selected) return notice("Select a server first.", true);
+          try {
+            const response = await request(
+              `api/commands/execute?serverId=${state.selected.id}&command=${encodeURIComponent($("command").value)}`,
+              { method: "POST" },
+            );
+            $("output").textContent = JSON.stringify(unwrap(response), null, 2);
+            notice("Command completed.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        $("add-command").onclick = () => openCommand();
+        $("refresh-commands").onclick = loadCommands;
+        $("command-crud-form").onsubmit = async (event) => {
+          event.preventDefault();
+          const id = $("command-id").value;
+          const body = {
+            name: $("command-name").value.trim(),
+            description: $("command-description").value.trim(),
+            parameters: $("command-parameters").value.trim(),
+            status: $("command-status").value,
+            result: $("command-result").value,
+            createdDttm: null,
+            lastUpdatedDttm: null,
+            createdSource: "UI",
+            lastUpdatedSource: "UI",
+          };
+          try {
+            await request(id ? `api/commands/${id}` : "api/commands", {
+              method: id ? "PUT" : "POST",
+              body: JSON.stringify(body),
+            });
+            $("command-modal").classList.remove("active");
+            await loadCommands();
+            notice(id ? "Command updated." : "Command created.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        const openServer = (id = null) => {
+          $("server-form").reset();
+          $("server-id").value = id || "";
+          $("os-type").value = "Linux";
+          if (id) {
+            const server = state.servers.find((item) => item.id === id);
+            if (!server) return notice("Server not found.", true);
+            $("hostname").value = server.hostname || "";
+            $("ip-address").value = server.ipAddress || "";
+            $("os-type").value = server.osType || "Linux";
+            $("server-status").value = server.status || "UNKNOWN";
+          }
+          $("server-modal").classList.add("active");
+        };
+        $("add-server").onclick = openServer;
+        $("add-server-page").onclick = openServer;
+        $("server-form").onsubmit = async (event) => {
+          event.preventDefault();
+          const id = $("server-id").value;
+          const body = {
+            id: id ? Number(id) : null,
+            hostname: $("hostname").value,
+            ipAddress: $("ip-address").value,
+            osType: $("os-type").value,
+            status: $("server-status").value,
+            paths: [],
+            services: [],
+            createdSource: "UI",
+            lastUpdatedSource: "UI",
+          };
+          try {
+            await request(id ? `api/servers/${id}` : "api/servers", {
+              method: id ? "PUT" : "POST",
+              body: JSON.stringify(body),
+            });
+            if (id) {
+              await syncServiceHealthUrls(
+                state.servers.find((server) => server.id === Number(id)),
+                body,
+              );
+            }
+            $("server-modal").classList.remove("active");
+            await loadServers();
+            notice("Server saved.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        const openService = (id = null) => {
+          if (!state.selected) return notice("Select a server first.", true);
+          const service = id
+            ? state.selected.services?.find((item) => item.id === id)
+            : null;
+          if (id && !service) return notice("Service not found.", true);
+          $("service-form").reset();
+          $("service-id").value = id || "";
+          $("service-server").value = state.selected.id;
+          if (service) {
+            $("service-name").value = service.serviceName || "";
+            $("service-type").value = service.healthCheckUrl ? "SPRING_BOOT" : "OTHER";
+            const logsPath = state.selected.paths?.find((path) => path.pathName === "LOGS_HOME");
+            const scriptsPath = state.selected.paths?.find((path) => path.pathName === "SCRIPTS_HOME");
+            $("logs-path").value = logsPath?.pathDescription || "";
+            $("scripts-path").value = scriptsPath?.pathDescription || "";
+            if (service.healthCheckUrl) {
+              try {
+                const url = new URL(service.healthCheckUrl);
+                $("actuator-port").value = url.port || "80";
+                $("context-path").value = url.pathname.replace(/\/actuator\/health\/?$/, "");
+              } catch {
+                $("actuator-port").value = "8080";
+                $("context-path").value = "";
+              }
+            }
+          }
+          $("spring-boot-fields").style.display =
+            $("service-type").value === "SPRING_BOOT" ? "block" : "none";
+          $("service-modal").classList.add("active");
+        };
+        $("add-service").onclick = () => {
+          if (!state.selected) return notice("Select a server first.", true);
+          openService();
+        };
+        $("service-type").onchange = (event) => {
+          $("spring-boot-fields").style.display =
+            event.target.value === "SPRING_BOOT" ? "block" : "none";
+        };
+        const actuatorBaseUrl = (server, port, contextPath) => {
+          const host = server.ipAddress || server.hostname;
+          const context = (contextPath || "").trim().replace(/^\/+|\/+$/g, "");
+          return `http://${host}:${port}${context ? `/${context}` : ""}`;
+        };
+        const servicePayload = (service, server, healthCheckUrl) => ({
+          ...service,
+          servers: [server],
+          healthCheckUrl,
+          createdDttm: null,
+          lastUpdatedDttm: null,
         });
+        const syncServiceHealthUrls = async (previousServer, updatedServer) => {
+          for (const service of previousServer?.services || []) {
+            if (!service.healthCheckUrl) continue;
+            const url = new URL(service.healthCheckUrl);
+            const host = updatedServer.ipAddress || updatedServer.hostname;
+            const healthCheckUrl = `${url.protocol}//${host}${url.port ? `:${url.port}` : ""}${url.pathname}`;
+            await request(`api/services/${service.id}`, {
+              method: "PUT",
+              body: JSON.stringify(servicePayload(service, updatedServer, healthCheckUrl)),
+            });
+          }
+        };
+        const createPath = async (server, pathName, pathValue) => {
+          if (!pathValue.trim()) return;
+          const serverRequest = {
+            id: server.id,
+            hostname: server.hostname,
+            ipAddress: server.ipAddress,
+            osType: server.osType,
+            status: server.status,
+            lastHealthChecked: null,
+            paths: [],
+            services: [],
+            createdDttm: null,
+            lastUpdatedDttm: null,
+            createdSource: "UI",
+            lastUpdatedSource: "UI",
+          };
+          await request("api/paths", {
+            method: "POST",
+            body: JSON.stringify({
+              id: null,
+              pathName,
+              pathDescription: pathValue.trim(),
+              servers: [serverRequest],
+              scripts: [],
+              createdDttm: null,
+              lastUpdatedDttm: null,
+              createdSource: "UI",
+              lastUpdatedSource: "UI",
+            }),
+          });
+        };
+        $("service-form").onsubmit = async (event) => {
+          event.preventDefault();
+          const server = state.servers.find(
+            (item) => item.id === Number($("service-server").value),
+          );
+          if (!server) return notice("Select a server first.", true);
+          const body = {
+            id: $("service-id").value ? Number($("service-id").value) : null,
+            servers: [server],
+            serviceName: $("service-name").value,
+            healthCheckUrl:
+              $("service-type").value === "SPRING_BOOT"
+                ? actuatorBaseUrl(
+                    server,
+                    Number($("actuator-port").value || 8080),
+                    $("context-path").value,
+                  ) + "/actuator/health"
+                : "",
+            lastHealthChecked: null,
+            createdDttm: null,
+            lastUpdatedDttm: null,
+            createdSource: "UI",
+            lastUpdatedSource: "UI",
+          };
+          try {
+            const id = $("service-id").value;
+            await request(id ? `api/services/${id}` : "api/services", {
+              method: id ? "PUT" : "POST",
+              body: JSON.stringify(body),
+            });
+            await createPath(server, "LOGS_HOME", $("logs-path").value);
+            await createPath(server, "SCRIPTS_HOME", $("scripts-path").value);
+            $("service-modal").classList.remove("active");
+            await loadServers();
+            await selectServer(server.id);
+            notice("Service saved.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        $("add-path").onclick = () => openPath();
+        $("add-script").onclick = () => openScript();
+        $("path-crud-form").onsubmit = async (event) => {
+          event.preventDefault();
+          const server = state.servers.find((item) => item.id === Number($("path-server").value));
+          if (!server) return notice("Select a server first.", true);
+          const id = $("path-id").value;
+          const body = { id: id ? Number(id) : null, pathName: $("path-name").value, pathDescription: $("path-description").value, servers: [server], scripts: [], createdDttm: null, lastUpdatedDttm: null, createdSource: "UI", lastUpdatedSource: "UI" };
+          try { await request(id ? `api/paths/${id}` : "api/paths", { method: id ? "PUT" : "POST", body: JSON.stringify(body) }); $("path-modal").classList.remove("active"); await loadSettings(); notice("Path saved."); } catch (error) { notice(error.message, true); }
+        };
+        $("script-crud-form").onsubmit = async (event) => {
+          event.preventDefault();
+          const id = $("script-id").value;
+          const body = { id: id ? Number(id) : null, scriptName: $("script-name").value, scriptExtension: $("script-extension").value, paths: [], createdDttm: null, lastUpdatedDttm: null, createdSource: "UI", lastUpdatedSource: "UI" };
+          try { await request(id ? `api/scripts/${id}` : "api/scripts", { method: id ? "PUT" : "POST", body: JSON.stringify(body) }); $("script-modal").classList.remove("active"); await loadSettings(); notice("Script saved."); } catch (error) { notice(error.message, true); }
+        };
+        document.querySelectorAll("[data-close]").forEach(
+          (button) =>
+            (button.onclick = () => {
+              if (button.dataset.close === "logs-modal") closeLogStream();
+              $(button.dataset.close).classList.remove("active");
+            }),
+        );
+        document
+          .querySelectorAll(".nav button")
+          .forEach(
+            (button) => (button.onclick = () => showPage(button.dataset.page)),
+          );
+        const escapeHtml = (value) =>
+          String(value ?? "").replace(
+            /[&<>"']/g,
+            (character) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;",
+              })[character],
+          );
+        loadServers();
+      })();
     </script>
-</body>
+  </body>
 </html>

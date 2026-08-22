@@ -4,23 +4,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.util.concurrent.ListenableFuture;
 
 import com.pawar.app.healthcheck.dto.AgentRequestDto;
 import com.pawar.app.healthcheck.dto.AgentResponseDto;
-import com.pawar.app.healthcheck.dto.CommandRequestDto;
-import com.pawar.app.healthcheck.dto.CommandResponseDto;
-import com.pawar.app.healthcheck.dto.ServerRequestDto;
-import com.pawar.app.healthcheck.dto.ServerResponseDto;
 import com.pawar.todo.amt.constants.AgentStatus;
-import com.pawar.todo.amt.constants.CommandStatus;
-import com.pawar.todo.amt.constants.ServerStatus;
 import com.pawar.todo.amt.exceptions.AgentOperationException;
-import com.pawar.todo.amt.exceptions.CommandOperationException;
-import com.pawar.todo.amt.exceptions.ResourceNotFoundException;
-import com.pawar.todo.amt.exceptions.ServerOperationException;
-import com.pawar.todo.amt.model.Server;
 
 public interface AgentService {
 	 public AgentResponseDto createAgent(AgentRequestDto agentRequestDto )throws AgentOperationException;

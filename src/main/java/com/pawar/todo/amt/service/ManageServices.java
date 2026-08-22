@@ -11,10 +11,11 @@ import com.pawar.todo.amt.exceptions.ServiceOperationException;
 
 public interface ManageServices {
 
-	public String startService(Integer agentId,Integer serviceId) throws AgentOperationException, ServiceOperationException, IOException, ServiceHealthStatusOperationException, PathOperationException, ResourceNotFoundException;
-	public String stopService(Integer agentId,Integer serviceId) throws AgentOperationException, ServiceOperationException, IOException, ResourceNotFoundException, ServiceHealthStatusOperationException, PathOperationException;
-	public String startAllServices(Integer agentId) throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
-	public String stopAllServices(Integer agentId) throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
+	public String startService(Integer serverId,Integer serviceId) throws AgentOperationException, ServiceOperationException, IOException, ServiceHealthStatusOperationException, PathOperationException, ResourceNotFoundException;
+	public String stopService(Integer serverId,Integer serviceId) throws AgentOperationException, ServiceOperationException, IOException, ResourceNotFoundException, ServiceHealthStatusOperationException, PathOperationException;
+	public String startAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
+	public String stopAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
+	public String restartAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
 	public void periodicServiceHealthCheck();
 	
 

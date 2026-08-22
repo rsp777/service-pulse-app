@@ -25,5 +25,6 @@ public interface CommandService {
 	 public CommandResponseDto updateCommand(Integer id, CommandRequestDto commandRequestDto) throws CommandOperationException;
 	 public ListenableFuture<Void> deleteCommandAsync(Integer id) throws CommandOperationException;
 	 public List<CommandResponseDto> findCommandsByStatus(CommandStatus status) throws CommandOperationException;
+	 public Optional<CommandResponseDto> findCommand(String nameOrDescription) throws CommandOperationException;
 	 public Optional<CommandResponseDto> findCommandByDescription(String string) throws CommandOperationException;
 }

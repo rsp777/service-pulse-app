@@ -21,7 +21,6 @@ import org.springframework.util.concurrent.ListenableFuture;
 import com.pawar.app.healthcheck.dto.AgentRequestDto;
 import com.pawar.app.healthcheck.dto.AgentResponseDto;
 import com.pawar.todo.amt.cache.AgentCache;
-import com.pawar.todo.amt.client.WebSocketAgentClient;
 import com.pawar.todo.amt.constants.AgentStatus;
 import com.pawar.todo.amt.exceptions.AgentOperationException;
 import com.pawar.todo.amt.exceptions.ResourceNotFoundException;
@@ -31,6 +30,7 @@ import com.pawar.todo.amt.model.Agent;
 import com.pawar.todo.amt.model.Server;
 import com.pawar.todo.amt.respository.AgentRepository;
 import com.pawar.todo.amt.respository.ServerRepository;
+import com.pawar.todo.amt.ssh.SshCommandService;
 
 @Service
 public class AgentServiceImpl implements AgentService {
@@ -41,16 +41,15 @@ public class AgentServiceImpl implements AgentService {
 	private final ServerRepository serverRepository;
 	private AgentMapper agentMapper;
 	private final AgentCache agentCache;
-	private final WebSocketAgentClient webSocketAgentClient;
+	private final SshCommandService sshCommandService;
 
 	public AgentServiceImpl(AgentRepository agentRepository, ServerRepository serverRepository,
-			AgentMapper agentMapper, AgentCache agentCache,
-			WebSocketAgentClient webSocketAgentClient) {
+			AgentMapper agentMapper, AgentCache agentCache, SshCommandService sshCommandService) {
 		this.agentRepository = agentRepository;
 		this.serverRepository = serverRepository;
 		this.agentMapper = agentMapper;
 		this.agentCache = agentCache;
-		this.webSocketAgentClient = webSocketAgentClient;
+		this.sshCommandService = sshCommandService;
 	}
 
 	@Autowired
@@ -235,13 +234,13 @@ public class AgentServiceImpl implements AgentService {
 	}
 
 	@Async
-	@Scheduled(cron = "*/60 * * * * *")
+	// @Scheduled(cron = "*/60 * * * * *")
 	@Transactional
 	public void periodicAgentHealthStatusCheck() throws AgentOperationException {
 		try {
 			List<AgentResponseDto> agents = findAllAgentsAsync().get();
 			for (AgentResponseDto agentDto : agents) {
-				boolean connectionStatus = webSocketAgentClient.checkConnectionStatus(agentDto.id());
+				boolean connectionStatus = agentDto.server() != null && sshCommandService.isReachable(agentDto.server());
 				Agent existingAgent = agentRepository.findById(agentDto.id())
 						.orElseThrow(() -> new ResourceNotFoundException("Agent not found with ID: " + agentDto.id()));
 
@@ -266,6 +265,8 @@ public class AgentServiceImpl implements AgentService {
 
 	@Override
 	public boolean checkAgentStatus(Integer id) throws AgentOperationException {
-		return webSocketAgentClient.checkConnectionStatus(id);
+		AgentResponseDto agent = findAgentById(id)
+				.orElseThrow(() -> new AgentOperationException("Agent not found with ID: " + id));
+		return agent.server() != null && sshCommandService.isReachable(agent.server());
 	}
 }
