@@ -810,7 +810,7 @@
           try {
             state.servers = unwrap(await request("api/servers")) || [];
             renderServers();
-            if (state.selected) selectServer(state.selected.id);
+            if (state.selected) await selectServer(state.selected.id);
             notice(`${state.servers.length} server(s) loaded.`);
           } catch (error) {
             notice(error.message, true);
@@ -1004,17 +1004,25 @@
         };
         const bulkServiceAction = async (action) => {
           if (!state.selected) return notice("Select a server first.", true);
+          const serverId = state.selected.id;
+          const bulkButtons = [
+            $("start-all-services"),
+            $("stop-all-services"),
+            $("restart-all-services"),
+          ];
+          bulkButtons.forEach((button) => (button.disabled = true));
           try {
             const response = await request(
-              `api/manage-services/${action}-all-service?serverId=${state.selected.id}`,
+              `api/manage-services/${action}-all-service?serverId=${serverId}`,
               { method: "POST" },
             );
             $("output").textContent = JSON.stringify(unwrap(response), null, 2);
             await loadServers();
-            await selectServer(state.selected.id);
-            notice(`${action} all request completed.`);
+            notice(`${action} all request completed for server ${serverId}.`);
           } catch (error) {
             notice(error.message, true);
+          } finally {
+            bulkButtons.forEach((button) => (button.disabled = false));
           }
         };
         $("server-select").onchange = (event) =>
