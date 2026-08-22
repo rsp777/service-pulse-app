@@ -387,6 +387,10 @@
             <article class="card">
               <h2>SSH command</h2>
               <form id="command-form">
+                <label for="command-select">Configured command</label>
+                <select id="command-select">
+                  <option value="">Custom command</option>
+                </select>
                 <label for="command">Command</label
                 ><textarea
                   id="command"
@@ -401,9 +405,9 @@
                 <h2>Services</h2>
                 <div class="actions">
                   <button class="btn secondary" id="refresh-services">Refresh</button>
-                  <button class="btn secondary" id="start-all-services">Start All</button>
-                  <button class="btn secondary" id="stop-all-services">Stop All</button>
-                  <button class="btn secondary" id="restart-all-services">Restart All</button>
+                  <button class="btn secondary" id="start-all-services" hidden>Start All</button>
+                  <button class="btn secondary" id="stop-all-services" hidden>Stop All</button>
+                  <button class="btn secondary" id="restart-all-services" hidden>Restart All</button>
                 </div>
               </div>
               <div id="service-list">Select a server to load services.</div>
@@ -700,6 +704,18 @@
           try { await request(`api/scripts/${id}`, { method: "DELETE" }); await loadSettings(); notice("Script deleted."); } catch (error) { notice(error.message, true); }
         };
         const renderCommands = (commands) => {
+          const commandSelect = $("command-select");
+          const selectedCommand = commandSelect.value;
+          commandSelect.innerHTML =
+            `<option value="">Custom command</option>${commands
+              .map(
+                (command) =>
+                  `<option value="${command.id}">${escapeHtml(command.description || command.name)}</option>`,
+              )
+              .join("")}`;
+          if (commands.some((command) => String(command.id) === selectedCommand)) {
+            commandSelect.value = selectedCommand;
+          }
           $("command-table").innerHTML = commands.length
             ? commands
                 .map(
@@ -810,7 +826,7 @@
           try {
             state.servers = unwrap(await request("api/servers")) || [];
             renderServers();
-            if (state.selected) selectServer(state.selected.id);
+            if (state.selected) await selectServer(state.selected.id);
             notice(`${state.servers.length} server(s) loaded.`);
           } catch (error) {
             notice(error.message, true);
@@ -867,6 +883,10 @@
         const loadServices = async () => {
           if (!state.selected) return;
           const services = state.selected.services || [];
+          const showBulkActions = services.length > 1;
+          ["start-all-services", "stop-all-services", "restart-all-services"].forEach(
+            (buttonId) => ($(buttonId).hidden = !showBulkActions),
+          );
           $("service-list").innerHTML = services.length
             ? services
                 .map(
@@ -1004,17 +1024,25 @@
         };
         const bulkServiceAction = async (action) => {
           if (!state.selected) return notice("Select a server first.", true);
+          const serverId = state.selected.id;
+          const bulkButtons = [
+            $("start-all-services"),
+            $("stop-all-services"),
+            $("restart-all-services"),
+          ];
+          bulkButtons.forEach((button) => (button.disabled = true));
           try {
             const response = await request(
-              `api/manage-services/${action}-all-service?serverId=${state.selected.id}`,
+              `api/manage-services/${action}-all-service?serverId=${serverId}`,
               { method: "POST" },
             );
             $("output").textContent = JSON.stringify(unwrap(response), null, 2);
             await loadServers();
-            await selectServer(state.selected.id);
-            notice(`${action} all request completed.`);
+            notice(`${action} all request completed for server ${serverId}.`);
           } catch (error) {
             notice(error.message, true);
+          } finally {
+            bulkButtons.forEach((button) => (button.disabled = false));
           }
         };
         $("server-select").onchange = (event) =>
@@ -1036,6 +1064,14 @@
           } catch (error) {
             notice(error.message, true);
           }
+        };
+        $("command-select").onchange = (event) => {
+          const command = state.commands.find(
+            (item) => String(item.id) === event.target.value,
+          );
+          $("command").value = command
+            ? [command.name, command.parameters].filter(Boolean).join(" ")
+            : "";
         };
         $("add-command").onclick = () => openCommand();
         $("refresh-commands").onclick = loadCommands;
@@ -1113,20 +1149,29 @@
             notice(error.message, true);
           }
         };
-        const openService = (id = null) => {
+        const openService = async (id = null) => {
           if (!state.selected) return notice("Select a server first.", true);
           const service = id
             ? state.selected.services?.find((item) => item.id === id)
             : null;
           if (id && !service) return notice("Service not found.", true);
+          try {
+            state.paths = unwrap(await request("api/paths")) || [];
+          } catch (error) {
+            return notice(`Unable to load configured paths: ${error.message}`, true);
+          }
           $("service-form").reset();
           $("service-id").value = id || "";
           $("service-server").value = state.selected.id;
           if (service) {
             $("service-name").value = service.serviceName || "";
             $("service-type").value = service.healthCheckUrl ? "SPRING_BOOT" : "OTHER";
-            const logsPath = state.selected.paths?.find((path) => path.pathName === "LOGS_HOME");
-            const scriptsPath = state.selected.paths?.find((path) => path.pathName === "SCRIPTS_HOME");
+            const serverPaths = state.paths.filter((path) =>
+              path.servers?.some((pathServer) => Number(pathServer.id) === Number(state.selected.id)),
+            );
+            const paths = serverPaths.length ? serverPaths : state.selected.paths || [];
+            const logsPath = paths.find((path) => path.pathName === "LOGS_HOME");
+            const scriptsPath = paths.find((path) => path.pathName === "SCRIPTS_HOME");
             $("logs-path").value = logsPath?.pathDescription || "";
             $("scripts-path").value = scriptsPath?.pathDescription || "";
             if (service.healthCheckUrl) {
@@ -1288,6 +1333,7 @@
               })[character],
           );
         loadServers();
+        loadCommands();
       })();
     </script>
   </body>

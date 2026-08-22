@@ -130,9 +130,7 @@ public class ManageServicesImpl implements ManageServices {
 		ServerResponseDto server = getServer(serverId);
 		ServiceResponseDto service = serviceService.findServiceById(serviceId)
 				.orElseThrow(() -> new ServiceOperationException("Service not found"));
-		ServiceHealthStatusResponseDto serviceHealthStatus = serviceHealthStatusService
-				.findServiceHealthStatusByServiceId(serviceId)
-				.orElseThrow(() -> new ServiceHealthStatusOperationException("Service health status not found"));
+		ServiceHealthStatusResponseDto serviceHealthStatus = getOrCreateHealthStatus(service);
 
 		log.info("Server: {}", server);
 
@@ -167,9 +165,7 @@ public class ManageServicesImpl implements ManageServices {
 		ServiceResponseDto service = serviceService.findServiceById(serviceId)
 				.orElseThrow(() -> new ServiceOperationException("Service not found"));
 
-		ServiceHealthStatusResponseDto serviceHealthStatus = serviceHealthStatusService
-				.findServiceHealthStatusByServiceId(serviceId)
-				.orElseThrow(() -> new ServiceHealthStatusOperationException("Service health status not found"));
+		ServiceHealthStatusResponseDto serviceHealthStatus = getOrCreateHealthStatus(service);
 
 		if (!server.status().equals(ServerStatus.ONLINE.toString())) {
 			log.info("Server {} is OFFLINE", server.hostname());
@@ -201,11 +197,14 @@ public class ManageServicesImpl implements ManageServices {
 
 	private String getPathAndScript(String scriptsHome, String scriptName)
 			throws PathOperationException, ResourceNotFoundException {
-		String path = pathService.findByPathName(scriptsHome).get().pathName();
+		String path = pathService.findByPathName(scriptsHome)
+				.orElseThrow(() -> new PathOperationException("Path not found: " + scriptsHome)).pathDescription();
 		Optional<ScriptResponseDto> scriptOptional = scriptService.findScriptByScriptName(scriptName);
-		String scriptName1 = scriptOptional.get().scriptName();
-		ScriptExtension scriptExtension = scriptExtensionConverter.toEnum(scriptOptional.get().scriptExtension());
-		return String.format("$%s/%s%s", path, scriptName1, scriptExtension.getExtension());
+		ScriptResponseDto script = scriptOptional
+				.orElseThrow(() -> new ResourceNotFoundException("Script not found: " + scriptName));
+		String scriptName1 = script.scriptName();
+		ScriptExtension scriptExtension = scriptExtensionConverter.toEnum(script.scriptExtension());
+		return String.format("%s/%s%s", path, scriptName1, scriptExtension.getExtension());
 	}
 
 	// private String startStopCommand(Integer agentId, ServiceResponseDto service)
@@ -334,9 +333,7 @@ public class ManageServicesImpl implements ManageServices {
 		String command = startStopCommand(null, "SCRIPTS_HOME", "startAll");// buildStartAllCommand();
 		log.info("Command: {}", command);
 		String response = sshCommandService.execute(server, command);
-		if (response.contains("Service started")) {
-			updateAllServiceHealthStatus("UP", "startAllServices");
-		}
+		updateAllServiceHealthStatus(serverId, "UP", "startAllServices");
 
 		return response;
 	}
@@ -356,9 +353,7 @@ public class ManageServicesImpl implements ManageServices {
 		;
 		log.info("Command: {}", command);
 		String response = sshCommandService.execute(server, command);
-		if (response.contains("Service stopped")) {
-			updateAllServiceHealthStatus("DOWN", "stopAllServices");
-		}
+		updateAllServiceHealthStatus(serverId, "DOWN", "stopAllServices");
 
 		return response;
 	}
@@ -392,14 +387,27 @@ public class ManageServicesImpl implements ManageServices {
 	}
 
 	// Method to update health status for all services
-	private void updateAllServiceHealthStatus(String status, String lastUpdatedSource)
-			throws ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
-		List<ServiceHealthStatusResponseDto> serviceHealthStatusResponseDtos = serviceHealthStatusService
-				.findAllServiceHealthStatussAsync().get();
-		for (ServiceHealthStatusResponseDto serviceHealthStatusResponseDto : serviceHealthStatusResponseDtos) {
-			updateServiceHealthStatus(serviceHealthStatusResponseDto, status, lastUpdatedSource);
+	private void updateAllServiceHealthStatus(Integer serverId, String status, String lastUpdatedSource)
+			throws AgentOperationException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
+		ServerResponseDto server = getServer(serverId);
+		for (ServiceResponseDto service : Optional.ofNullable(server.services()).orElse(Set.of())) {
+			ServiceHealthStatusResponseDto healthStatus = getOrCreateHealthStatus(service);
+			updateServiceHealthStatus(healthStatus, status, lastUpdatedSource);
 		}
-		log.info("Updated health status to {} for all services", status);
+		log.info("Updated health status to {} for services on server {}", status, serverId);
+	}
+
+	private ServiceHealthStatusResponseDto getOrCreateHealthStatus(ServiceResponseDto service)
+			throws ServiceHealthStatusOperationException {
+		Optional<ServiceHealthStatusResponseDto> existing = serviceHealthStatusService
+				.findServiceHealthStatusByServiceId(service.id());
+		if (existing.isPresent()) {
+			return existing.get();
+		}
+		ServiceRequestDto serviceRequest = serviceMapper.reqToDto(serviceMapper.toEntity(service));
+		return serviceHealthStatusService.createServiceHealthStatus(new ServiceHealthStatusRequestDto(
+					null, serviceRequest, "UNKNOWN", LocalDateTime.now(), null, null, null, LocalDateTime.now(),
+					"SERVICE_MANAGEMENT", "SERVICE_MANAGEMENT"));
 	}
 
 	@Override
