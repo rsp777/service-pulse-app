@@ -127,7 +127,7 @@ class ManageServicesImplTest {
         when(scriptExtensionConverter.toEnum("SH")).thenReturn(ScriptExtension.SH);
         when(commandService.findCommand("CheckService")).thenReturn(Optional.of(command("systemctl", "is-active")));
         when(serverService.findServerById(1)).thenReturn(Optional.of(server));
-        when(sshCommandService.execute(server, "$SCRIPTS_HOME/stop.sh billing")).thenReturn("stopped");
+        when(sshCommandService.execute(server, "/opt/scripts/stop.sh billing")).thenReturn("stopped");
         when(sshCommandService.execute(server, "systemctl is-active billing")).thenReturn("inactive");
         when(serviceHealthStatusMapper.toEntity(health)).thenReturn(serviceHealthStatusEntity);
         when(serviceMapper.reqToDto(any())).thenReturn(null);
