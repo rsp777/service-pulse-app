@@ -51,34 +51,34 @@ public class PathServiceImpl implements PathService {
 
 	@Override
 	@Transactional
-	public PathResponseDto createPath(PathRequestDto pathRequestDto) throws ResourceAlreadyExistsException {
-		try {
-			logger.info("Creating new Path: {}", pathRequestDto);
-			validatePathRequest(pathRequestDto);
+	public PathResponseDto createPath(PathRequestDto pathRequestDto) {
+		logger.info("Processing Path upsert: {}", pathRequestDto);
 
-			Path path = pathMapper.toEntity(pathRequestDto);
-			Set<ScriptRequestDto> scriptRequestDtos = pathRequestDto.scripts();
-			Set<Script> scripts = new HashSet<>();
+		LocalDateTime now = LocalDateTime.now();
 
-			if (!scriptRequestDtos.isEmpty()) {
-				for (ScriptRequestDto scriptRequestDto : scriptRequestDtos) {
-					Script script = scriptMapper.toEntity(scriptRequestDto);
-					logger.info("script : {}",script);
-					scripts.add(script);
-				}
-				path.setScripts(scripts);
+		// Fetch existing entity or initialize a new one
+		Path path = pathRepository.findByPathName(pathRequestDto.pathName())
+				.orElseGet(() -> {
+					Path newPath = new Path();
+					newPath.setPathName(pathRequestDto.pathName());
+					newPath.setCreatedDttm(now);
+					return newPath;
+				});
+
+		// Map and assign scripts safely
+		Set<Script> scripts = new HashSet<>();
+		if (pathRequestDto.scripts() != null && !pathRequestDto.scripts().isEmpty()) {
+			for (ScriptRequestDto scriptDto : pathRequestDto.scripts()) {
+				scripts.add(scriptMapper.toEntity(scriptDto));
 			}
-			path.setCreatedDttm(LocalDateTime.now());
-			path.setLastUpdatedDttm(LocalDateTime.now());
-			path.setScripts(scripts);
-			Path savedPath = pathRepository.save(path);
-			logger.debug("Path created successfully: ID={}", path.getId());
-
-			return pathMapper.toDto(savedPath);
-		} catch (Exception e) {
-			logger.error("Failed to create path: ", e);
-			throw new ResourceAlreadyExistsException("Failed to create path", e);
 		}
+		path.setScripts(scripts);
+		path.setLastUpdatedDttm(now);
+
+		Path savedPath = pathRepository.save(path);
+		logger.debug("Path saved successfully: ID={}", savedPath.getId());
+
+		return pathMapper.toDto(savedPath);
 	}
 
 	@Override
@@ -115,18 +115,19 @@ public class PathServiceImpl implements PathService {
 		return CompletableFuture.supplyAsync(() -> {
 			try {
 				List<Path> paths = pathRepository.findAll();
-				
-				logger.info("Path : {}",paths);
-				
-//				List<PathResponseDto> response = paths.stream()
-//						.peek(path -> logger.info("Processing path : {}", path.toString())).map(pathMapper::toDto)
-//						.collect(Collectors.toList());
+
+				logger.info("Path : {}", paths);
+
+				// List<PathResponseDto> response = paths.stream()
+				// .peek(path -> logger.info("Processing path : {}",
+				// path.toString())).map(pathMapper::toDto)
+				// .collect(Collectors.toList());
 				List<PathResponseDto> pathResponseDtos = new ArrayList<>();
 				for (Path path : paths) {
 					PathResponseDto pathResponseDto = pathMapper.toDto(path);
 					pathResponseDtos.add(pathResponseDto);
 				}
-				
+
 				logger.info("Async paths fetch completed successfully");
 				return pathResponseDtos;
 			} catch (Exception e) {
@@ -187,12 +188,8 @@ public class PathServiceImpl implements PathService {
 		}
 	}
 
-	private void validatePathRequest(PathRequestDto dto) throws ResourceAlreadyExistsException {
-
-		if (pathRepository.existsByPathName(dto.pathName())) {
-			throw new ResourceAlreadyExistsException("Path with pathName '" + dto.pathName() + "' already exists");
-		}
-
+	private boolean validatePathRequest(PathRequestDto dto) throws ResourceAlreadyExistsException {
+		return pathRepository.existsByPathName(dto.pathName());
 	}
 
 	@Override

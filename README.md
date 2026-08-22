@@ -12,6 +12,7 @@ The Service Pulse App is a Spring Boot application designed to monitor the healt
 *   **Asynchronous Operations:** Utilizes `CompletableFuture` and a dedicated thread pool to handle operations like agent and service management in a non-blocking manner, enhancing performance and scalability.
 *   **RESTful API:** Exposes a comprehensive set of REST endpoints for interacting with all major resources (Agents, Services, etc.).
 *   **Auditing:** Includes dedicated audit logging for critical events like agent creation and deletion.
+*   **SSH Command Execution:** Executes remote Linux commands through SSH public-key authentication with host-key verification; no remote WebSocket agent is required.
 
 ## Core Components
 
@@ -43,3 +44,17 @@ mvn clean install
 ```bash
 java -jar target/service-pulse-app-0.0.1-SNAPSHOT.jar
 ```
+
+### SSH Configuration
+
+Remote command execution and agent status checks use the existing Agent `host` value from the database. Configure shared SSH authentication through environment variables; do not store private keys or passphrases in the database or repository.
+
+```powershell
+$env:SSH_USERNAME = "service-pulse"
+$env:SSH_PRIVATE_KEY_PATH = "C:\secrets\service-pulse\id_ed25519"
+$env:SSH_KNOWN_HOSTS_PATH = "C:\secrets\service-pulse\known_hosts"
+$env:SSH_PRIVATE_KEY_PASSPHRASE = ""
+$env:SSH_PORT = "22"
+```
+
+`SSH_KNOWN_HOSTS_PATH` is mandatory. The application rejects unknown host keys instead of disabling host-key checks.

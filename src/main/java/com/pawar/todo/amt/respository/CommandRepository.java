@@ -17,6 +17,7 @@ public interface CommandRepository extends JpaRepository<Command, Integer> {
 
 	Optional<Command> findByStatus(CommandStatus commandStatus);
 	Optional<Command> findByDescription(String description);
+	Optional<Command> findFirstByNameOrDescription(String name, String description);
 
 
 }

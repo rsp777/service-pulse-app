@@ -19,37 +19,44 @@
 		<!--<spring-cloud.version>2022.0.3</spring-cloud.version>-->
 	</properties>
 	<dependencies>
-	<!-- https://mvnrepository.com/artifact/org.springframework/spring-websocket -->
-<!-- https://mvnrepository.com/artifact/org.springframework/spring-websocket -->
-<dependency>
-    <groupId>org.springframework</groupId>
-    <artifactId>spring-websocket</artifactId>
-    <version>6.0.13</version>
-</dependency>
-	<dependency>
+		<!-- https://mvnrepository.com/artifact/org.springframework/spring-websocket -->
+		<!-- https://mvnrepository.com/artifact/org.springframework/spring-websocket -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-websocket</artifactId>
+			<version>6.0.13</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework</groupId>
+					<artifactId>spring-messaging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<version>1.18.36</version>
 			<scope>provided</scope>
 		</dependency>
 		<!-- https://mvnrepository.com/artifact/org.springframework/spring-messaging -->
-<dependency>
-    <groupId>org.springframework</groupId>
-    <artifactId>spring-messaging</artifactId>
-    <version>6.0.13</version>
-</dependency>
-		<!-- https://mvnrepository.com/artifact/com.jcraft/jsch -->
-<dependency>
-    <groupId>com.jcraft</groupId>
-    <artifactId>jsch</artifactId>
-    <version>0.1.55</version>
-</dependency>
+		<!-- <dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-messaging</artifactId>
+			<version>6.0.13</version>
+		</dependency> -->
 		<!-- https://mvnrepository.com/artifact/com.netflix.eureka/eureka-client 
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
 		</dependency>-->
-
+		<!-- Source: https://mvnrepository.com/artifact/com.hierynomus/sshj -->
+		<!-- Source: https://mvnrepository.com/artifact/com.hierynomus/sshj -->
+		<dependency>
+			<groupId>com.hierynomus</groupId>
+			<artifactId>sshj</artifactId>
+			<version>0.40.0</version>
+			<scope>runtime</scope>
+		</dependency>
 		<dependency>
 			<groupId>com.google.code.gson</groupId>
 			<artifactId>gson</artifactId>
@@ -66,7 +73,7 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
-		
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
@@ -117,7 +124,7 @@
 			<artifactId>mariadb-java-client</artifactId>
 			<version>3.3.2</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
@@ -199,11 +206,11 @@
 			<version>Dev_v2.1</version>
 		</dependency>
 		<!-- https://mvnrepository.com/artifact/jakarta.validation/jakarta.validation-api -->
-<dependency>
-    <groupId>jakarta.validation</groupId>
-    <artifactId>jakarta.validation-api</artifactId>
-    <version>3.1.1</version>
-</dependency>
+		<dependency>
+			<groupId>jakarta.validation</groupId>
+			<artifactId>jakarta.validation-api</artifactId>
+			<version>3.1.1</version>
+		</dependency>
 		<!--<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-config</artifactId>
@@ -225,10 +232,7 @@
 		</dependencies>
 	</dependencyManagement>
 	<repositories>
-		<!--<repository>
-			<id>my-repo-id</id>
-			<url>http://localhost:8081/repository/maven-snapshots/</url>
-		</repository>-->
+
 		<repository>
 			<id>github</id>
 			<name>GitHub OWNER Apache Maven Packages</name>
@@ -236,15 +240,11 @@
 		</repository>
 	</repositories>
 	<distributionManagement>
-		<!--<repository>
-			<id>my-repo-id</id>
-			<url>http://localhost:8081/repository/maven-snapshots/</url>
-		</repository>-->
-		<!--<repository>
+		<repository>
 			<id>github</id>
 			<name>GitHub OWNER Apache Maven Packages</name>
-			<url>https://maven.pkg.github.com/rsp777/register-service</url>
-		</repository>-->
+			<url>https://maven.pkg.github.com/rsp777/service-pulse-app</url>
+		</repository>
 	</distributionManagement>
 	<build>
 		<pluginManagement>

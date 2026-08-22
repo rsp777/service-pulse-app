@@ -13,7 +13,10 @@ import org.springframework.web.bind.annotation.*;
 import com.pawar.app.healthcheck.dto.CommandRequestDto;
 import com.pawar.app.healthcheck.dto.CommandResponseDto;
 import com.pawar.todo.amt.exceptions.CommandOperationException;
+import com.pawar.todo.amt.response.ApiResponse;
 import com.pawar.todo.amt.service.CommandService;
+import com.pawar.todo.amt.service.ServerService;
+import com.pawar.todo.amt.ssh.SshCommandService;
 
 @RestController
 @RequestMapping("/api/commands")
@@ -23,9 +26,26 @@ public class CommandController {
 	private static final Logger auditLogger = LoggerFactory.getLogger("AUDIT_LOGGER");
 
 	private final CommandService commandService;
+	private final ServerService serverService;
+	private final SshCommandService sshCommandService;
 
-	public CommandController(CommandService commandService) {
+	public CommandController(CommandService commandService, ServerService serverService, SshCommandService sshCommandService) {
 		this.commandService = commandService;
+		this.serverService = serverService;
+		this.sshCommandService = sshCommandService;
+	}
+
+	@PostMapping("/execute")
+	public ResponseEntity<ApiResponse<String>> execute(@RequestParam Integer serverId, @RequestParam String command) {
+		try {
+			String output = sshCommandService.execute(serverService.findServerById(serverId)
+					.orElseThrow(() -> new IllegalArgumentException("Server not found: " + serverId)), command);
+			return ResponseEntity.ok(new ApiResponse<>(true, "Command completed", output));
+		} catch (Exception exception) {
+			logger.error("Command execution failed for server {}", serverId, exception);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(new ApiResponse<>(false, exception.getMessage(), null));
+		}
 	}
 
 	@PostMapping

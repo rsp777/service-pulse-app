@@ -18,10 +18,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pawar.app.healthcheck.dto.AgentResponseDto;
+import com.pawar.app.healthcheck.dto.CommandResponseDto;
 import com.pawar.app.healthcheck.dto.PathResponseDto;
 import com.pawar.app.healthcheck.dto.ScriptResponseDto;
 import com.pawar.app.healthcheck.dto.ServerRequestDto;
@@ -31,11 +28,9 @@ import com.pawar.app.healthcheck.dto.ServiceHealthStatusResponseDto;
 import com.pawar.app.healthcheck.dto.ServiceRequestDto;
 import com.pawar.app.healthcheck.dto.ServiceResponseDto;
 import com.pawar.sop.http.service.HttpService;
-import com.pawar.todo.amt.constants.AgentStatus;
-import com.pawar.todo.amt.constants.CommandResult;
 import com.pawar.todo.amt.constants.HealthCheckStatus;
+import com.pawar.todo.amt.constants.ServerStatus;
 import com.pawar.todo.amt.constants.ScriptExtension;
-import com.pawar.todo.amt.controller.ManageServicesController;
 import com.pawar.todo.amt.converter.ScriptExtensionConverter;
 import com.pawar.todo.amt.exceptions.AgentOperationException;
 import com.pawar.todo.amt.exceptions.PathOperationException;
@@ -45,8 +40,10 @@ import com.pawar.todo.amt.exceptions.ServiceOperationException;
 import com.pawar.todo.amt.mapper.ServerMapper;
 import com.pawar.todo.amt.mapper.ServiceHealthStatusMapper;
 import com.pawar.todo.amt.mapper.ServiceMapper;
+import com.pawar.todo.amt.model.Command;
 import com.pawar.todo.amt.model.ServiceHealthStatus;
 import com.pawar.todo.amt.respository.ServiceRepository;
+import com.pawar.todo.amt.ssh.SshCommandService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -54,15 +51,15 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class ManageServicesImpl implements ManageServices {
 
-	private final WebSocketAgentService webSocketAgentService;
+	private final SshCommandService sshCommandService;
 	private ScriptService scriptService;
 	private ServiceService serviceService;
 	private ServiceHealthStatusService serviceHealthStatusService;
-	private AgentService agentService;
+	private ServerService serverService;
+	private CommandService commandService;
 	private final ScriptExtensionConverter scriptExtensionConverter;
 	private ServiceHealthStatusMapper serviceHealthStatusMapper;
 	private ServiceMapper serviceMapper;
-	private final ManageServicesController manageServicesController;
 	private final HttpService httpService;
 
 	private PathService pathService;
@@ -70,12 +67,11 @@ public class ManageServicesImpl implements ManageServices {
 	@Autowired
 	private ServiceRepository serviceRepository;
 
-	public ManageServicesImpl(WebSocketAgentService webSocketAgentService,
-			ScriptExtensionConverter scriptExtensionConverter, ManageServicesController manageServicesController,
+	public ManageServicesImpl(SshCommandService sshCommandService,
+			ScriptExtensionConverter scriptExtensionConverter,
 			HttpService httpService) {
-		this.webSocketAgentService = webSocketAgentService;
+		this.sshCommandService = sshCommandService;
 		this.scriptExtensionConverter = scriptExtensionConverter;
-		this.manageServicesController = manageServicesController;
 		this.httpService = httpService;
 	}
 
@@ -100,8 +96,13 @@ public class ManageServicesImpl implements ManageServices {
 	}
 
 	@Autowired
-	public void setAgentService(AgentService agentService) {
-		this.agentService = agentService;
+	public void setServerService(ServerService serverService) {
+		this.serverService = serverService;
+	}
+
+	@Autowired
+	public void setCommandService(CommandService commandService) {
+		this.commandService = commandService;
 	}
 
 	@Autowired
@@ -118,63 +119,51 @@ public class ManageServicesImpl implements ManageServices {
 
 	// @Autowired
 	// public void setServerMapper(ServerMapper serverMapper) {
-	// 	this.serverMapper = serverMapper;
+	// this.serverMapper = serverMapper;
 
 	// }
 
 	@Override
-	public String startService(Integer agentId, Integer serviceId) throws AgentOperationException,
+	public String startService(Integer serverId, Integer serviceId) throws AgentOperationException,
 			ServiceOperationException, IOException, ServiceHealthStatusOperationException, PathOperationException,
 			ResourceNotFoundException {
-		AgentResponseDto agent = agentService.findAgentById(agentId)
-				.orElseThrow(() -> new AgentOperationException("Agent does not exist"));
+		ServerResponseDto server = getServer(serverId);
 		ServiceResponseDto service = serviceService.findServiceById(serviceId)
 				.orElseThrow(() -> new ServiceOperationException("Service not found"));
 		ServiceHealthStatusResponseDto serviceHealthStatus = serviceHealthStatusService
 				.findServiceHealthStatusByServiceId(serviceId)
 				.orElseThrow(() -> new ServiceHealthStatusOperationException("Service health status not found"));
 
-		log.info("Agent: {}", agent);
+		log.info("Server: {}", server);
 
-		if (!agent.status().equals(AgentStatus.ONLINE.toString())) {
-			log.info("Agent {} is OFFLINE", agent.name());
-			return "Agent is OFFLINE";
+		if (!server.status().equals(ServerStatus.ONLINE.toString())) {
+			log.info("Server {} is OFFLINE", server.hostname());
+			return "Server is OFFLINE";
+		}
+		if (isServiceRunning(serverId, service.serviceName())) {
+			log.info("Service {} is already running on server {}", service.serviceName(), server.hostname());
+			updateServiceHealthStatus(serviceHealthStatus, "UP", "startServiceCheck");
+			return "Service is already running";
 		}
 		log.info("Service : {}", service);
 		String command = startStopCommand(service, "SCRIPTS_HOME", "start");// buildStartCommand(agentId, service);
 		log.info("Command: {}", command);
-		String response = webSocketAgentService.sendCommand(agentId, command);
-		String responseMessage = manageServicesController.waitForResponse().getPayload();
-		log.info("responseMessage : {}", responseMessage);
-
-		CommandResult commandResult = mapCommandResult(responseMessage);
-
-		if (commandResult == null && response == null) {
-			log.error("No response received from agent for command: {}", command);
-			return "Failed to start service: No response from agent.";
-		} else if (commandResult != null && responseMessage.contains("Service started")) {
+		String response = sshCommandService.execute(server, command);
+		if (isServiceRunning(serverId, service.serviceName())) {
 			updateServiceHealthStatus(serviceHealthStatus, "UP", "startService");
-			log.info("Service {} started successfully for Agent ID {}. Response: {}", service.serviceName(), agentId,
-					response);
-			return response;
-		} else if (commandResult != null
-				&& responseMessage.contains("WebSocket session is closed. Cannot send message.")) {
-			log.info("Failed to start the service : {}", service.serviceName(), response);
-			return response;
 		}
 
-		log.info("Service {} started successfully for Agent ID {}. Response: {}", service.serviceName(), agentId,
+		log.info("Service {} started successfully for Server ID {}. Response: {}", service.serviceName(), serverId,
 				response);
 		return response;
 	}
 
 	@Override
-	public String stopService(Integer agentId, Integer serviceId) throws AgentOperationException,
+	public String stopService(Integer serverId, Integer serviceId) throws AgentOperationException,
 			ServiceOperationException, IOException, ResourceNotFoundException, ServiceHealthStatusOperationException,
 			PathOperationException {
 
-		AgentResponseDto agent = agentService.findAgentById(agentId)
-				.orElseThrow(() -> new AgentOperationException("Agent does not exist"));
+		ServerResponseDto server = getServer(serverId);
 		ServiceResponseDto service = serviceService.findServiceById(serviceId)
 				.orElseThrow(() -> new ServiceOperationException("Service not found"));
 
@@ -182,47 +171,21 @@ public class ManageServicesImpl implements ManageServices {
 				.findServiceHealthStatusByServiceId(serviceId)
 				.orElseThrow(() -> new ServiceHealthStatusOperationException("Service health status not found"));
 
-		if (!agent.status().equals(AgentStatus.ONLINE.toString())) {
-			log.info("Agent {} is OFFLINE", agent.name());
-			return "Agent is OFFLINE";
+		if (!server.status().equals(ServerStatus.ONLINE.toString())) {
+			log.info("Server {} is OFFLINE", server.hostname());
+			return "Server is OFFLINE";
 		}
 
 		String command = startStopCommand(service, "SCRIPTS_HOME", "stop");// buildStopCommand(service, script);
 		log.info("Command: {}", command);
-		String response = webSocketAgentService.sendCommand(agentId, command);
-		String responseMessage = manageServicesController.waitForResponse().getPayload();
-		log.info("responseMessage : {}", responseMessage);
-
-		CommandResult commandResult = mapCommandResult(responseMessage);
-
-		if (commandResult == null && response == null) {
-			log.error("No response received from agent for command: {}", command);
-			return "Failed to stop service: No response from agent.";
-		} else if (commandResult != null && commandResult.getOutput().contains("Service stopped")) {
-			updateServiceHealthStatus(serviceHealthStatus, "DOWN", "stopService");
-			log.info("Service {} stopped successfully for Agent ID {}. Response: {}", service.serviceName(), agentId,
-					response);
-			return response;
-		} else if (commandResult != null
-				&& commandResult.getOutput().contains("WebSocket session is closed. Cannot send message.")) {
-			log.info("Failed to stop the service : {}", service.serviceName(), response);
-			return response;
+		String response = sshCommandService.execute(server, command);
+		boolean serviceRunning = isServiceRunning(serverId, service.serviceName());
+		updateServiceHealthStatus(serviceHealthStatus, serviceRunning ? "UP" : "DOWN", "stopServiceCheck");
+		if (serviceRunning) {
+			log.warn("Service {} is still running on server {} after stop command", service.serviceName(),
+					server.hostname());
 		}
 		return response;
-	}
-
-	private CommandResult mapCommandResult(String responseMessage)
-			throws JsonMappingException, JsonProcessingException {
-
-		if (responseMessage.contains("requestId") && responseMessage.contains("status")
-				&& responseMessage.contains("output") && responseMessage.contains("error")) {
-
-			ObjectMapper objectMapper = new ObjectMapper();
-			CommandResult commandResult = objectMapper.readValue(responseMessage, CommandResult.class);
-			return commandResult;
-		}
-		return null;
-
 	}
 
 	private String startStopCommand(ServiceResponseDto service, String scriptsHome, String scriptName)
@@ -347,78 +310,85 @@ public class ManageServicesImpl implements ManageServices {
 		serviceHealthStatusService.updateServiceHealthStatus(serviceHealthStatus.id(), serviceHealthStatusRequestDto);
 	}
 
+	private ServerResponseDto getServer(Integer serverId) throws AgentOperationException {
+		try {
+			return serverService.findServerById(serverId)
+					.orElseThrow(() -> new AgentOperationException("Server does not exist"));
+		} catch (com.pawar.todo.amt.exceptions.ServerOperationException exception) {
+			throw new AgentOperationException("Failed to load server", exception);
+		}
+	}
+
 	@Override
-	public String startAllServices(Integer agentId) throws AgentOperationException, IOException, PathOperationException,
+	public String startAllServices(Integer serverId)
+			throws AgentOperationException, IOException, PathOperationException,
 			ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
-		AgentResponseDto agent = agentService.findAgentById(agentId)
-				.orElseThrow(() -> new AgentOperationException("Agent does not exist"));
+		ServerResponseDto server = getServer(serverId);
 
-		log.info("Agent: {}", agent);
+		log.info("Server: {}", server);
 
-		if (!agent.status().equals(AgentStatus.ONLINE.toString())) {
-			log.info("Agent {} is OFFLINE", agent.name());
-			return "Agent is OFFLINE";
+		if (!server.status().equals(ServerStatus.ONLINE.toString())) {
+			log.info("Server {} is OFFLINE", server.hostname());
+			return "Server is OFFLINE";
 		}
 		String command = startStopCommand(null, "SCRIPTS_HOME", "startAll");// buildStartAllCommand();
 		log.info("Command: {}", command);
-		String response = webSocketAgentService.sendCommand(agentId, command);
-		String responseMessage = manageServicesController.waitForResponse().getPayload();
-		log.info("responseMessage : {}", responseMessage);
-
-		CommandResult commandResult = mapCommandResult(responseMessage);
-
-		if (commandResult == null && response == null) {
-			log.error("No response received from agent for command: {}", command);
-			return "Failed to start service: No response from agent.";
-		} else if (commandResult != null && responseMessage.contains("Service started")) {
+		String response = sshCommandService.execute(server, command);
+		if (response.contains("Service started")) {
 			updateAllServiceHealthStatus("UP", "startAllServices");
-			log.info("All Services started successfully , Response: {}", response);
-			return response;
-		} else if (commandResult != null
-				&& responseMessage.contains("WebSocket session is closed. Cannot send message.")) {
-			log.info("Failed to start the services : {}", response);
-			return response;
 		}
 
 		return response;
 	}
 
 	@Override
-	public String stopAllServices(Integer agentId) throws AgentOperationException, IOException, PathOperationException,
+	public String stopAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException,
 			ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
-		AgentResponseDto agent = agentService.findAgentById(agentId)
-				.orElseThrow(() -> new AgentOperationException("Agent does not exist"));
+		ServerResponseDto server = getServer(serverId);
 
-		log.info("Agent: {}", agent);
+		log.info("Server: {}", server);
 
-		if (!agent.status().equals(AgentStatus.ONLINE.toString())) {
-			log.info("Agent {} is OFFLINE", agent.name());
-			return "Agent is OFFLINE";
+		if (!server.status().equals(ServerStatus.ONLINE.toString())) {
+			log.info("Server {} is OFFLINE", server.hostname());
+			return "Server is OFFLINE";
 		}
 		String command = startStopCommand(null, "SCRIPTS_HOME", "stopAll");
 		;
 		log.info("Command: {}", command);
-		String response = webSocketAgentService.sendCommand(agentId, command);
-		String responseMessage = manageServicesController.waitForResponse().getPayload();
-		log.info("responseMessage : {}", responseMessage);
-
-		CommandResult commandResult = mapCommandResult(responseMessage);
-
-		if (commandResult == null && response == null) {
-			log.error("No response received from agent for command: {}", command);
-			return "Failed to start service: No response from agent.";
-		} else if (commandResult != null && responseMessage.contains("Service started")
-				&& commandResult.getStatus().equals("COMPLETED")) {
+		String response = sshCommandService.execute(server, command);
+		if (response.contains("Service stopped")) {
 			updateAllServiceHealthStatus("DOWN", "stopAllServices");
-			log.info("All Services stopped successfully , Response: {}", response);
-			return response;
-		} else if (commandResult != null
-				&& responseMessage.contains("WebSocket session is closed. Cannot send message.")) {
-			log.info("Failed to stopped the services : {}", response);
-			return response;
 		}
 
 		return response;
+	}
+
+	@Override
+	public String restartAllServices(Integer serverId)
+			throws AgentOperationException, IOException, PathOperationException,
+			ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
+		stopAllServices(serverId);
+		return startAllServices(serverId);
+	}
+
+	public boolean isServiceRunning(Integer serverId, String serviceName) {
+		try {
+
+			CommandResponseDto commandResponseDto = commandService.findCommand("CheckService")
+					.orElseThrow(() -> new ServiceOperationException("Command does not exist"));
+
+			String isServiceRunningCmd = commandResponseDto.name() + " " + commandResponseDto.parameters() + " "
+					+ serviceName;
+			ServerResponseDto server = getServer(serverId);
+			String response = sshCommandService.execute(server, isServiceRunningCmd).trim().toLowerCase();
+			log.info("Service: {}, Response: {}", serviceName, response);
+			return response.equals("active") || response.equals("running") || response.equals("up")
+					|| response.contains(" active ") || response.startsWith("active ");
+		} catch (Exception e) {
+			log.error("Error during service health check", e);
+		}
+		return false;
+
 	}
 
 	// Method to update health status for all services
@@ -434,7 +404,7 @@ public class ManageServicesImpl implements ManageServices {
 
 	@Override
 	@Async
-	@Scheduled(cron = "*/60 * * * * *")
+	@Scheduled(cron = "${healthcheck.cron}")
 	@Transactional
 	public void periodicServiceHealthCheck() {
 		try {
@@ -471,7 +441,7 @@ public class ManageServicesImpl implements ManageServices {
 	public boolean isServiceRunning(String healthCheckUrl) {
 		boolean isServiceRunning = false;
 		try {
-			ResponseEntity<String> response = httpService.restCall(null,healthCheckUrl, HttpMethod.GET, null, null);
+			ResponseEntity<String> response = httpService.restCall(null, healthCheckUrl, HttpMethod.GET, null, null);
 			log.info("Response : {}", response);
 			log.info("Response Code: {}", response.getStatusCode());
 
