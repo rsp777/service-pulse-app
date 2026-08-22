@@ -1113,20 +1113,29 @@
             notice(error.message, true);
           }
         };
-        const openService = (id = null) => {
+        const openService = async (id = null) => {
           if (!state.selected) return notice("Select a server first.", true);
           const service = id
             ? state.selected.services?.find((item) => item.id === id)
             : null;
           if (id && !service) return notice("Service not found.", true);
+          try {
+            state.paths = unwrap(await request("api/paths")) || [];
+          } catch (error) {
+            return notice(`Unable to load configured paths: ${error.message}`, true);
+          }
           $("service-form").reset();
           $("service-id").value = id || "";
           $("service-server").value = state.selected.id;
           if (service) {
             $("service-name").value = service.serviceName || "";
             $("service-type").value = service.healthCheckUrl ? "SPRING_BOOT" : "OTHER";
-            const logsPath = state.selected.paths?.find((path) => path.pathName === "LOGS_HOME");
-            const scriptsPath = state.selected.paths?.find((path) => path.pathName === "SCRIPTS_HOME");
+            const serverPaths = state.paths.filter((path) =>
+              path.servers?.some((pathServer) => Number(pathServer.id) === Number(state.selected.id)),
+            );
+            const paths = serverPaths.length ? serverPaths : state.selected.paths || [];
+            const logsPath = paths.find((path) => path.pathName === "LOGS_HOME");
+            const scriptsPath = paths.find((path) => path.pathName === "SCRIPTS_HOME");
             $("logs-path").value = logsPath?.pathDescription || "";
             $("scripts-path").value = scriptsPath?.pathDescription || "";
             if (service.healthCheckUrl) {
