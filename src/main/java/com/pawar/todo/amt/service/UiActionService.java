@@ -10,11 +10,15 @@ import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.pawar.todo.amt.model.UiAction;
 import com.pawar.todo.amt.respository.UiActionRepository;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Service
+@Slf4j
 public class UiActionService {
 
     private final UiActionRepository repository;
@@ -24,15 +28,20 @@ public class UiActionService {
     }
 
     @Cacheable(value = "sdui_configs", key = "#viewContext")
+    @Transactional(readOnly = true)
     public List<UiAction> getActions(String viewContext) {
-        return repository.findByViewContextOrderBySidebarCategoryAscPanelTitleAscActionLabelAsc(viewContext);
+        List<UiAction> actions = repository.findByViewContextOrderBySidebarCategoryAscPanelTitleAscActionLabelAsc(viewContext);
+        log.info("Loaded {} SDUI actions for view context={}", actions.size(), viewContext);
+        return actions;
     }
 
     public Map<String, Map<String, List<UiAction>>> getGroupedActions(String viewContext) {
-        return getActions(viewContext).stream().collect(Collectors.groupingBy(
+        Map<String, Map<String, List<UiAction>>> groupedActions = getActions(viewContext).stream().collect(Collectors.groupingBy(
                 action -> valueOrDefault(action.getSidebarCategory(), "General"), TreeMap::new,
                 Collectors.groupingBy(action -> valueOrDefault(action.getPanelTitle(), "Actions"), TreeMap::new,
                         Collectors.toList())));
+        log.debug("Grouped SDUI actions for view context={} into {} categories", viewContext, groupedActions.size());
+        return groupedActions;
     }
 
     public String md5(List<UiAction> actions) {

@@ -11,7 +11,10 @@ import org.springframework.stereotype.Component;
 import com.pawar.todo.amt.model.UiAction;
 import com.pawar.todo.amt.respository.UiActionRepository;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Component
+@Slf4j
 public class UiActionCacheDriftMonitor {
     private final UiActionRepository repository;
     private final UiActionService service;
@@ -26,9 +29,19 @@ public class UiActionCacheDriftMonitor {
 
     @Scheduled(fixedDelayString = "${sdui.cache-drift-check-millis:60000}")
     public void detectDrift() {
-        Cache cache = cacheManager.getCache("sdui_configs");
-        if (cache == null) return;
-        driftDetected.set(repository.findDistinctViewContexts().stream().anyMatch(viewContext -> differs(cache, viewContext)));
+        try {
+            Cache cache = cacheManager.getCache("sdui_configs");
+            if (cache == null) {
+                log.warn("Skipping SDUI cache drift check because cache sdui_configs is unavailable");
+                return;
+            }
+            boolean detected = repository.findDistinctViewContexts().stream().anyMatch(viewContext -> differs(cache, viewContext));
+            boolean previouslyDetected = driftDetected.getAndSet(detected);
+            if (detected && !previouslyDetected) log.warn("SDUI cache drift detected; clear the cache or restart the application");
+            if (!detected && previouslyDetected) log.info("SDUI cache drift is no longer detected");
+        } catch (RuntimeException exception) {
+            log.error("SDUI cache drift check failed", exception);
+        }
     }
 
     private boolean differs(Cache cache, String viewContext) {
@@ -40,5 +53,8 @@ public class UiActionCacheDriftMonitor {
     }
 
     public boolean isDriftDetected() { return driftDetected.get(); }
-    public void clearDrift() { driftDetected.set(false); }
+    public void clearDrift() {
+        driftDetected.set(false);
+        log.info("SDUI cache drift state cleared");
+    }
 }
