@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${viewContext + ' | Service Pulse'}">Service Pulse</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root { font-family: Georgia, serif; color: #16231b; background: #f2f0e7; }
+        body { margin: 0; } main { max-width: 1440px; margin: auto; padding: 24px; }
+        .drift-alert { background: #9b2c2c; color: white; padding: 14px 24px; font-weight: bold; }
+        .dashboard { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+        .sidebar { grid-column: span 3; border-right: 1px solid #b9beb2; } .content { grid-column: span 9; }
+        .panel { background: #fffef8; border: 1px solid #b9beb2; margin-bottom: 16px; padding: 16px; }
+        .actions { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+        .span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-12 { grid-column: span 12; }
+        .action { min-height: 70px; border: 1px solid #365d45; background: #e2ecdf; color: #16231b; cursor: pointer; font: inherit; }
+        .apm-terminal-window { min-height: 160px; overflow: auto; background: #111a15; color: #b9f6ca; padding: 16px; }
+        @media (max-width: 800px) { .sidebar, .content, .span-4, .span-6 { grid-column: span 12; } }
+    </style>
+</head>
+<body>
+    <div class="drift-alert" th:if="${driftDetected}" role="alert">Dashboard configuration changed. Restart the application or flush the SDUI cache at /api/admin/cache/clear before continuing.</div>
+    <main>
+        <h1 th:text="${viewContext}">Dashboard</h1>
+        <div class="dashboard">
+            <aside class="sidebar"><h2>Operations</h2><ul><li th:each="category : ${dashboardActions.keySet()}" th:text="${category}">Category</li></ul></aside>
+            <section class="content">
+                <section class="panel" th:each="category : ${dashboardActions}">
+                    <h2 th:text="${category.key}">Category</h2>
+                    <section th:each="panel : ${category.value}"><h3 th:text="${panel.key}">Panel</h3>
+                        <div class="actions"><button class="action" th:each="action : ${panel.value}" th:classappend="${' ' + action.gridSpan}" th:attr="data-endpoint=${action.actionEndpoint},data-payload=${action.requestPayload}" th:text="${action.iconClass == null ? action.actionLabel : action.iconClass + ' ' + action.actionLabel}">Action</button></div>
+                    </section>
+                </section>
+                <h2>APM Log Explorer</h2><pre id="apm-terminal" class="apm-terminal-window">Waiting for command output...</pre>
+            </section>
+        </div>
+    </main>
+    <script>
+        document.querySelectorAll('.action').forEach((button) => button.addEventListener('click', async () => {
+            const terminal = document.getElementById('apm-terminal'); terminal.textContent = 'Executing ' + button.textContent + '...';
+            try { const response = await fetch(button.dataset.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: button.dataset.payload || null }); const result = await response.json(); terminal.textContent = result.data || result.message || 'Command completed'; Swal.fire({ toast: true, position: 'top-end', icon: result.success ? 'success' : 'error', title: result.message, showConfirmButton: false, timer: 3500 }); }
+            catch (error) { terminal.textContent = error.message; Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Action failed', showConfirmButton: false, timer: 3500 }); }
+        }));
+    </script>
+</body>
+</html>
