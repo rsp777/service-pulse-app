@@ -2,6 +2,8 @@ package com.pawar.todo.amt.service;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import com.pawar.todo.amt.exceptions.AgentOperationException;
 import com.pawar.todo.amt.exceptions.PathOperationException;
@@ -16,6 +18,9 @@ public interface ManageServices {
 	public String startAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
 	public String stopAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
 	public String restartAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
+	public void streamAllServices(Integer serverId, String action, Consumer<String> lineConsumer, AtomicBoolean stopped)
+			throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException,
+			ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
 	public void periodicServiceHealthCheck();
 	
 

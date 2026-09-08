@@ -31,6 +31,7 @@ import com.pawar.todo.amt.mapper.ServiceHealthStatusMapper;
 import com.pawar.todo.amt.mapper.ServiceMapper;
 import com.pawar.todo.amt.model.ServiceHealthStatus;
 import com.pawar.todo.amt.service.CommandService;
+import com.pawar.todo.amt.service.AlertConfigurationService;
 import com.pawar.todo.amt.service.ManageServicesImpl;
 import com.pawar.todo.amt.service.PathService;
 import com.pawar.todo.amt.service.ScriptService;
@@ -55,6 +56,7 @@ class ManageServicesImplTest {
     @Mock private ServiceHealthStatusMapper serviceHealthStatusMapper;
     @Mock private ServiceMapper serviceMapper;
     @Mock private PathService pathService;
+    @Mock private AlertConfigurationService alertConfigurationService;
     @Mock private ServiceHealthStatus serviceHealthStatusEntity;
 
     private ManageServicesImpl manageServices;
@@ -63,7 +65,8 @@ class ManageServicesImplTest {
 
     @BeforeEach
     void setUp() {
-        manageServices = new ManageServicesImpl(sshCommandService, scriptExtensionConverter, httpService);
+        manageServices = new ManageServicesImpl(sshCommandService, scriptExtensionConverter, httpService,
+            alertConfigurationService);
         manageServices.setScriptService(scriptService);
         manageServices.setServiceService(serviceService);
         manageServices.setServiceHealthStatusService(serviceHealthStatusService);
@@ -75,8 +78,7 @@ class ManageServicesImplTest {
 
         server = new ServerResponseDto(1, "web-01", "10.0.0.1", "Linux", ServerStatus.ONLINE.toString(),
                 null, null, null, null, null, "test", "test");
-        service = new ServiceResponseDto(7, null, "billing", "http://10.0.0.1:8080/actuator/health",
-                null, null, null, "test", "test");
+        service = new ServiceResponseDto(7, null, "billing", null, null, "test", "test");
     }
 
     @Test
@@ -127,7 +129,7 @@ class ManageServicesImplTest {
         when(scriptExtensionConverter.toEnum("SH")).thenReturn(ScriptExtension.SH);
         when(commandService.findCommand("CheckService")).thenReturn(Optional.of(command("systemctl", "is-active")));
         when(serverService.findServerById(1)).thenReturn(Optional.of(server));
-        when(sshCommandService.execute(server, "/opt/scripts/stop.sh billing")).thenReturn("stopped");
+        when(sshCommandService.execute(server, "$SCRIPTS_HOME/stop.sh billing")).thenReturn("stopped");
         when(sshCommandService.execute(server, "systemctl is-active billing")).thenReturn("inactive");
         when(serviceHealthStatusMapper.toEntity(health)).thenReturn(serviceHealthStatusEntity);
         when(serviceMapper.reqToDto(any())).thenReturn(null);

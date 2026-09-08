@@ -23,9 +23,10 @@ public interface ServiceHealthStatusRepository extends JpaRepository<ServiceHeal
 
 	Optional<List<ServiceHealthStatus>> findByStatus(HealthCheckStatus healthCheckStatus);
 
-	@Query(value = "select shs.* from service_health_status shs inner join service s on shs.service_id=s.service_id \r\n"
-			+ "inner join server_service ss on shs.service_id = ss.service_id where ss.server_id = :id", nativeQuery = true)
+	@Query(value = "select shs.* from service_health_status shs inner join server_service ss on shs.service_id = ss.service_id and shs.server_id = ss.server_id where ss.server_id = :id and shs.server_id = :id", nativeQuery = true)
 	Optional<List<ServiceHealthStatus>> findByServerId(Integer id);
 
 	Optional<ServiceHealthStatus> findServiceHealthStatusByServiceId(Integer serviceId);
+
+	Optional<ServiceHealthStatus> findByServiceIdAndServerId(Integer serviceId, Integer serverId);
 }

@@ -58,3 +58,50 @@ $env:SSH_PORT = "22"
 ```
 
 `SSH_KNOWN_HOSTS_PATH` is mandatory. The application rejects unknown host keys instead of disabling host-key checks.
+
+### Runtime flags
+
+The scheduler and remote service-management endpoints can be disabled without changing the application binary. The Settings page displays and saves the two feature flags; saved database values override the environment defaults:
+
+```powershell
+$env:HEALTHCHECK_ENABLED = "true"
+$env:SERVICE_MANAGEMENT_ENABLED = "true"
+$env:HEALTHCHECK_CRON = "0 0/1 * * * *"
+```
+
+The scheduler interval is read when the application starts. Service health URLs are stored per server-service association at `/api/server-service-configurations/server/{serverId}`. Existing services continue to use their legacy shared URL until a server-specific configuration is saved.
+
+This flag `backfill-data.populate.enabled`
+
+For deployments using `spring.jpa.hibernate.ddl-auto=none`, run the idempotent migrations at [db/mysql/V2__server_service_configuration.sql](db/mysql/V2__server_service_configuration.sql) and [db/mysql/V3__alert_managemenzt.sql](db/mysql/V3__alert_management.sql) before starting the application. `V2` creates the server-specific configuration tables, migrates existing service URLs, seeds the runtime flags, and removes the legacy `service.healthCheckUrl` column. `V3` creates the alert configuration and alert event tables and seeds the alert-management runtime flag.
+
+Set `JPA_DDL_AUTO=none` when deploying with this script. Set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` to the same database used to run the migration. For SSH execution, set `SSH_USERNAME`, `SSH_PRIVATE_KEY_PATH`, and `SSH_KNOWN_HOSTS_PATH`; the application requires a known-hosts file when strict host-key checking is enabled.
+
+The migration is equivalent to these schema changes:
+
+```sql
+CREATE TABLE application_configuration (
+	configuration_key VARCHAR(100) NOT NULL PRIMARY KEY,
+	configuration_value VARCHAR(500) NOT NULL,
+	last_updated_dttm DATETIME NULL
+);
+
+CREATE TABLE server_service_configuration (
+	configuration_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	server_id INT NOT NULL,
+	service_id INT NOT NULL,
+	health_check_url VARCHAR(255) NULL,
+	created_dttm DATETIME NULL,
+	last_updated_dttm DATETIME NULL,
+	created_source VARCHAR(255) NULL,
+	last_updated_source VARCHAR(255) NULL,
+	UNIQUE KEY uq_server_service_configuration (server_id, service_id)
+);
+
+ALTER TABLE service_health_status ADD COLUMN server_id INT NULL;
+ALTER TABLE service_health_status ADD UNIQUE KEY uq_service_health_server (server_id, service_id);
+
+-- Run after copying any existing service.healthCheckUrl values into
+-- server_service_configuration.
+ALTER TABLE service DROP COLUMN healthCheckUrl;
+```

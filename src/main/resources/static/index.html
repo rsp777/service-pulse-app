@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="/service-pulse-app/" />
     <title>Service Pulse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
@@ -179,6 +180,10 @@
         border-radius: 5px;
         background: #fff;
         color: var(--ink);
+      }
+      label input[type="checkbox"] {
+        width: auto;
+        margin-right: 8px;
       }
       textarea {
         min-height: 92px;
@@ -362,6 +367,7 @@
           <button class="active" data-page="dashboard">Dashboard</button
           ><button data-page="servers">Servers</button
           ><button data-page="commands">Commands</button
+          ><button data-page="alerts" id="alerts-nav">Alerts</button
           ><button data-page="settings">Settings</button>
         </nav>
       </aside>
@@ -440,6 +446,11 @@
             <div id="command-table">Loading commands...</div>
           </div>
         </section>
+        <section id="alerts" class="page">
+          <div class="header"><h2>Alert Management</h2><button class="btn" id="add-alert">+ Add alert</button></div>
+          <div class="card"><div class="toolbar"><h2>Alert rules</h2><button class="btn secondary" id="refresh-alerts">Refresh</button></div><div id="alert-table">Loading alerts...</div></div>
+          <div class="card"><h2>Recent triggered alerts</h2><div id="alert-events">Loading alert history...</div></div>
+        </section>
         <section id="settings" class="page">
           <div class="header"><h2>Settings</h2></div>
           <div class="card">
@@ -448,6 +459,19 @@
               through environment-backed properties. Private keys are never
               stored in this browser or in server records.
             </p>
+          </div>
+          <div class="card">
+            <div class="toolbar"><h2>Runtime configuration</h2><span id="runtime-config-status">Loading...</span></div>
+            <div class="grid">
+              <label><input id="healthcheck-enabled" type="checkbox"/> Scheduled health checks enabled</label>
+              <label><input id="service-management-enabled" type="checkbox"/> Remote service management enabled</label>
+              <label><input id="alert-management-enabled" type="checkbox"/> Alert management enabled</label>
+              <label><input id="backend-alert-configuration" type="checkbox"/> Backend alert configuration enabled</label>
+              <label for="healthcheck-cron">Health-check schedule</label>
+              <input id="healthcheck-cron" readonly />
+            </div>
+            <small>The scheduler interval is read at startup. Feature flags are stored by the application and take effect immediately.</small>
+            <div class="modal-footer"><button class="btn" id="save-runtime-config" type="button">Save configuration</button></div>
           </div>
           <div class="grid">
             <article class="card">
@@ -553,6 +577,18 @@
         <pre id="logs-output">No logs loaded.</pre>
       </div>
     </div>
+    <div class="modal" id="scripts-unavailable-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Scripts unavailable</h3>
+          <button class="close" data-close="scripts-unavailable-modal">&times;</button>
+        </div>
+        <p id="scripts-unavailable-message">The requested scripts are unavailable on this server.</p>
+        <div class="modal-footer">
+          <button class="btn" data-close="scripts-unavailable-modal" type="button">Close</button>
+        </div>
+      </div>
+    </div>
     <div class="modal" id="command-modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -595,6 +631,7 @@
     </div>
     <div class="modal" id="path-modal"><div class="modal-content"><div class="modal-header"><h3>Path</h3><button class="close" data-close="path-modal">&times;</button></div><form id="path-crud-form"><input type="hidden" id="path-id"><label for="path-name">Name</label><input id="path-name" required placeholder="LOGS_HOME"><label for="path-description">Filesystem path</label><input id="path-description" required placeholder="/opt/apps/logs"><label for="path-server">Server</label><select id="path-server" required></select><div class="modal-footer"><button type="button" class="btn secondary" data-close="path-modal">Cancel</button><button class="btn" type="submit">Save path</button></div></form></div></div>
     <div class="modal" id="script-modal"><div class="modal-content"><div class="modal-header"><h3>Script</h3><button class="close" data-close="script-modal">&times;</button></div><form id="script-crud-form"><input type="hidden" id="script-id"><label for="script-name">Name</label><input id="script-name" required placeholder="start"><label for="script-extension">Extension</label><select id="script-extension"><option value="SH">SH</option><option value="BASH">BASH</option><option value="BAT">BAT</option></select><div class="modal-footer"><button type="button" class="btn secondary" data-close="script-modal">Cancel</button><button class="btn" type="submit">Save script</button></div></form></div></div>
+    <div class="modal" id="alert-modal"><div class="modal-content"><div class="modal-header"><h3>Alert rule</h3><button class="close" data-close="alert-modal">&times;</button></div><form id="alert-form"><input type="hidden" id="alert-id"><label for="alert-name">Name</label><input id="alert-name" required placeholder="Payments down"><label for="alert-target-type">Target</label><select id="alert-target-type"><option value="SERVER">Server</option><option value="SERVICE">Service</option></select><label for="alert-server">Server</label><select id="alert-server"></select><label for="alert-service">Service</label><select id="alert-service"></select><label for="alert-condition-type">Condition</label><select id="alert-condition-type"><option value="STATUS">Health status</option><option value="RESPONSE_TIME">Response time</option></select><label for="alert-operator">Operator</label><select id="alert-operator"><option value="EQUALS">Equals</option><option value="NOT_EQUALS">Not equals</option></select><label for="alert-condition-value">Expected value</label><input id="alert-condition-value" required placeholder="DOWN"><label><input id="alert-enabled" type="checkbox" checked> Alert enabled</label><div class="modal-footer"><button type="button" class="btn secondary" data-close="alert-modal">Cancel</button><button class="btn" type="submit">Save alert</button></div></form></div></div>
     <div class="context" id="context">
       <button data-action="logs">View logs</button
       ><button data-action="start">Start service</button
@@ -610,8 +647,12 @@
           commands: [],
           paths: [],
           scripts: [],
+          alerts: [],
+          alertEvents: [],
+          serverServiceConfigurations: [],
         };
         let currentLogStream = null;
+        let currentServiceActionStream = null;
         const $ = (id) => document.getElementById(id);
         const unwrap = (value) => value?.data ?? value;
         const notice = (text, error = false) => {
@@ -623,11 +664,22 @@
             headers: { "Content-Type": "application/json" },
             ...options,
           });
-          if (!response.ok)
-            throw new Error(
-              (await response.text()) || `${response.status} request failed`,
-            );
-          return response.status === 204 ? null : response.json();
+          if (!response.ok) {
+            const body = await response.text();
+            try {
+              const payload = JSON.parse(body);
+              const error = new Error(payload.message || `${response.status} request failed`);
+              error.code = payload.code;
+              throw error;
+            } catch (error) {
+              if (error instanceof SyntaxError) throw new Error(body || `${response.status} request failed`);
+              throw error;
+            }
+          }
+          if (response.status === 204) return null;
+          const payload = await response.json();
+          if (payload?.message) notice(payload.message, payload.success === false);
+          return payload;
         };
         const showPage = (page) => {
           document
@@ -642,18 +694,84 @@
             );
           if (page === "servers") renderServerTable();
           if (page === "commands") loadCommands();
+          if (page === "alerts") loadAlerts();
           if (page === "settings") loadSettings();
         };
         const loadSettings = async () => {
           try {
             state.paths = unwrap(await request("api/paths")) || [];
             state.scripts = unwrap(await request("api/scripts")) || [];
+            const runtime = unwrap(await request("api/configuration/runtime"));
+            $("healthcheck-enabled").checked = Boolean(runtime.healthCheckEnabled);
+            $("service-management-enabled").checked = Boolean(runtime.serviceManagementEnabled);
+            $("alert-management-enabled").checked = Boolean(runtime.alertManagementEnabled);
+            $("health-status-population-enabled").checked = Boolean(runtime.healthStatusPopulationEnabled);
+            $("alerts-nav").hidden = !runtime.alertManagementEnabled;
+            $("healthcheck-cron").value = runtime.healthCheckCron || "";
+            $("runtime-config-status").textContent = "Loaded";
             renderPaths();
             renderScripts();
           } catch (error) {
+            $("runtime-config-status").textContent = "Unavailable";
             notice(error.message, true);
           }
         };
+        $("save-runtime-config").onclick = async () => {
+          try {
+            const runtime = unwrap(await request("api/configuration/runtime", {
+              method: "PUT",
+              body: JSON.stringify({
+                healthCheckEnabled: $("healthcheck-enabled").checked,
+                serviceManagementEnabled: $("service-management-enabled").checked,
+                alertManagementEnabled: $("alert-management-enabled").checked,
+                healthStatusPopulationEnabled: $("health-status-population-enabled").checked,
+              }),
+            }));
+            $("healthcheck-enabled").checked = Boolean(runtime.healthCheckEnabled);
+            $("service-management-enabled").checked = Boolean(runtime.serviceManagementEnabled);
+            $("alert-management-enabled").checked = Boolean(runtime.alertManagementEnabled);
+            $("health-status-population-enabled").checked = Boolean(runtime.healthStatusPopulationEnabled);
+            $("alerts-nav").hidden = !runtime.alertManagementEnabled;
+            $("runtime-config-status").textContent = "Saved";
+            notice("Runtime configuration saved.");
+          } catch (error) {
+            if (error.message.includes("SCRIPTS_UNAVAILABLE")) {
+              $("scripts-unavailable-message").textContent =
+                `Scripts are unavailable on server ${serverId}. Configure the required scripts on that server before running ${action} all.`;
+              $("scripts-unavailable-modal").classList.add("active");
+            }
+            notice(error.message, true);
+          }
+        };
+        const loadAlerts = async () => {
+          try {
+            state.alerts = await request("api/alerts") || [];
+            state.alertEvents = await request("api/alerts/events") || [];
+            renderAlerts();
+          } catch (error) { notice(error.message, true); }
+        };
+        const renderAlerts = () => {
+          $("alert-table").innerHTML = state.alerts.length ? state.alerts.map((alert) => {
+            const target = alert.targetType === "SERVER" ? state.servers.find((item) => item.id === alert.serverId)?.hostname || `Server #${alert.serverId}` : state.servers.flatMap((item) => item.services || []).find((item) => item.id === alert.serviceId)?.serviceName || `Service #${alert.serviceId}`;
+            return `<div class="service"><span><strong>${escapeHtml(alert.name)}</strong><small>${escapeHtml(alert.targetType)}: ${escapeHtml(target)} · ${escapeHtml(alert.conditionType)} ${escapeHtml(alert.operator)} ${escapeHtml(alert.conditionValue)}</small></span><span class="actions"><button class="btn secondary" data-alert-toggle="${alert.id}">${alert.enabled ? "Disable" : "Enable"}</button><button class="btn secondary" data-alert-edit="${alert.id}">Edit</button><button class="btn danger" data-alert-delete="${alert.id}">Delete</button></span></div>`;
+          }).join("") : "No alert rules configured.";
+          $("alert-events").innerHTML = state.alertEvents.length ? state.alertEvents.map((event) => `<div class="service"><span><strong>${escapeHtml(event.message)}</strong><small>${escapeHtml(event.triggeredDttm || "")} · server ${event.serverId ?? "-"} · service ${event.serviceId ?? "-"}</small></span></div>`).join("") : "No triggered alerts.";
+          document.querySelectorAll("[data-alert-edit]").forEach((button) => button.onclick = () => openAlert(Number(button.dataset.alertEdit)));
+          document.querySelectorAll("[data-alert-delete]").forEach((button) => button.onclick = () => deleteAlert(Number(button.dataset.alertDelete)));
+          document.querySelectorAll("[data-alert-toggle]").forEach((button) => button.onclick = () => toggleAlert(Number(button.dataset.alertToggle)));
+        };
+        const populateAlertTargets = () => {
+          $("alert-server").innerHTML = `<option value="">Select server</option>${state.servers.map((server) => `<option value="${server.id}">${escapeHtml(server.hostname || server.ipAddress)}</option>`).join("")}`;
+          $("alert-service").innerHTML = `<option value="">Select service</option>${state.servers.flatMap((server) => (server.services || []).map((service) => `<option value="${service.id}">${escapeHtml(service.serviceName)} (${escapeHtml(server.hostname || server.ipAddress)})</option>`)).join("")}`;
+        };
+        const openAlert = (id = null) => {
+          populateAlertTargets(); $("alert-form").reset(); $("alert-id").value = id || ""; $("alert-enabled").checked = true;
+          if (id) { const alert = state.alerts.find((item) => item.id === id); if (!alert) return notice("Alert not found.", true); Object.entries({"alert-name": alert.name, "alert-target-type": alert.targetType, "alert-server": alert.serverId || "", "alert-service": alert.serviceId || "", "alert-condition-type": alert.conditionType, "alert-operator": alert.operator, "alert-condition-value": alert.conditionValue}).forEach(([key, value]) => $(key).value = value); $("alert-enabled").checked = alert.enabled; }
+          toggleAlertTarget(); $("alert-modal").classList.add("active");
+        };
+        const toggleAlertTarget = () => { const server = $("alert-target-type").value === "SERVER"; $("alert-server").disabled = !server; $("alert-service").disabled = server; };
+        const deleteAlert = async (id) => { if (!window.confirm("Delete this alert?")) return; try { await request(`api/alerts/${id}`, { method: "DELETE" }); await loadAlerts(); } catch (error) { notice(error.message, true); } };
+        const toggleAlert = async (id) => { const alert = state.alerts.find((item) => item.id === id); if (!alert) return; try { await request(`api/alerts/${id}`, { method: "PUT", body: JSON.stringify({...alert, enabled: !alert.enabled}) }); await loadAlerts(); } catch (error) { notice(error.message, true); } };
         const renderPaths = () => {
           $("path-table").innerHTML = state.paths.length
             ? state.paths.map((path) => `<div class="service" data-path-id="${path.id}"><span><strong>${escapeHtml(path.pathName)}</strong><small>${escapeHtml(path.pathDescription || "")}</small></span><span class="actions"><button class="btn secondary" data-path-action="edit">Edit</button><button class="btn danger" data-path-action="delete">Delete</button></span></div>`).join("")
@@ -843,6 +961,13 @@
           } catch {
             state.healthStatuses = {};
           }
+          try {
+            state.serverServiceConfigurations = unwrap(
+              await request(`api/server-service-configurations/server/${id}`),
+            ) || [];
+          } catch {
+            state.serverServiceConfigurations = [];
+          }
           $("selected-title").textContent =
             state.selected.hostname || state.selected.ipAddress;
           $("selected-meta").textContent =
@@ -883,6 +1008,10 @@
         const loadServices = async () => {
           if (!state.selected) return;
           const services = state.selected.services || [];
+          const serviceUrl = (service) =>
+            state.serverServiceConfigurations.find(
+              (configuration) => configuration.serviceId === service.id,
+            )?.healthCheckUrl || "";
           const showBulkActions = services.length > 1;
           ["start-all-services", "stop-all-services", "restart-all-services"].forEach(
             (buttonId) => ($(buttonId).hidden = !showBulkActions),
@@ -891,7 +1020,7 @@
             ? services
                 .map(
                   (service) =>
-                    `<div class="service" data-service-id="${service.id}"><span><strong>${escapeHtml(service.serviceName)}</strong><small>${escapeHtml(service.healthCheckUrl || "")}</small><small>Version: <span id="version-${service.id}">Unknown</span> · <span id="indicator-${service.id}" class="status ${state.healthStatuses[service.id] === "UP" ? "" : state.healthStatuses[service.id] === "DOWN" ? "offline" : "unknown"}" style="${state.healthStatuses[service.id] ? "" : "background:#edf0f2;color:#64717d"}">${escapeHtml(state.healthStatuses[service.id] || "UNKNOWN")}</span></small></span><span class="actions"><button class="btn" data-action="start">Start</button><button class="btn secondary" data-action="stop">Stop</button><button class="btn secondary" data-action="logs">Logs</button><button class="btn secondary" data-edit-service="${service.id}">Edit</button><button class="btn secondary" data-delete-service="${service.id}">Delete</button></span></div>`,
+                    `<div class="service" data-service-id="${service.id}"><span><strong>${escapeHtml(service.serviceName)}</strong><small>${escapeHtml(serviceUrl(service))}</small><small>Version: <span id="version-${service.id}">Unknown</span> · <span id="indicator-${service.id}" class="status ${state.healthStatuses[service.id] === "UP" ? "" : state.healthStatuses[service.id] === "DOWN" ? "offline" : "unknown"}" style="${state.healthStatuses[service.id] ? "" : "background:#edf0f2;color:#64717d"}">${escapeHtml(state.healthStatuses[service.id] || "UNKNOWN")}</span></small></span><span class="actions"><button class="btn" data-action="start">Start</button><button class="btn secondary" data-action="stop">Stop</button><button class="btn secondary" data-action="logs">Logs</button><button class="btn secondary" data-edit-service="${service.id}">Edit</button><button class="btn secondary" data-delete-service="${service.id}">Delete</button></span></div>`,
                 )
                 .join("")
             : "No services are attached to this server.";
@@ -915,7 +1044,9 @@
             (button) =>
               (button.onclick = () => deleteService(Number(button.dataset.deleteService))),
           );
-          services.forEach(updateServiceRuntime);
+          services.forEach((service) =>
+            updateServiceRuntime({ ...service, healthCheckUrl: serviceUrl(service) }),
+          );
         };
         const deleteService = async (id) => {
           if (!window.confirm("Delete this service?")) return;
@@ -932,6 +1063,11 @@
           if (!currentLogStream) return;
           currentLogStream.close();
           currentLogStream = null;
+        };
+        const closeServiceActionStream = () => {
+          if (!currentServiceActionStream) return;
+          currentServiceActionStream.close();
+          currentServiceActionStream = null;
         };
         window.addEventListener("pagehide", closeLogStream);
         window.addEventListener("beforeunload", closeLogStream);
@@ -1031,19 +1167,40 @@
             $("restart-all-services"),
           ];
           bulkButtons.forEach((button) => (button.disabled = true));
-          try {
-            const response = await request(
-              `api/manage-services/${action}-all-service?serverId=${serverId}`,
-              { method: "POST" },
-            );
-            $("output").textContent = JSON.stringify(unwrap(response), null, 2);
+          closeServiceActionStream();
+          const outputEl = $("output");
+          outputEl.textContent = `Running ${action} all on server ${serverId}...\n`;
+          currentServiceActionStream = new EventSource(
+            `api/manage-services/${action}-all-service/stream?serverId=${serverId}`,
+          );
+          currentServiceActionStream.addEventListener("output", (event) => {
+            outputEl.textContent += `${event.data}\n`;
+            outputEl.scrollTop = outputEl.scrollHeight;
+          });
+          currentServiceActionStream.addEventListener("complete", async () => {
+            closeServiceActionStream();
             await loadServers();
             notice(`${action} all request completed for server ${serverId}.`);
-          } catch (error) {
-            notice(error.message, true);
-          } finally {
             bulkButtons.forEach((button) => (button.disabled = false));
-          }
+          });
+          currentServiceActionStream.addEventListener("error", (event) => {
+            const message = event.data || "Lifecycle script execution failed.";
+            if (message.includes("SCRIPTS_UNAVAILABLE")) {
+              $("scripts-unavailable-message").textContent =
+                `Scripts are unavailable on server ${serverId}. Configure the required scripts on that server before running ${action} all.`;
+              $("scripts-unavailable-modal").classList.add("active");
+            }
+            outputEl.textContent += `${message}\n`;
+            notice(message, true);
+            closeServiceActionStream();
+            bulkButtons.forEach((button) => (button.disabled = false));
+          });
+          currentServiceActionStream.onerror = () => {
+            if (!currentServiceActionStream) return;
+            closeServiceActionStream();
+            notice("Lifecycle script stream disconnected.", true);
+            bulkButtons.forEach((button) => (button.disabled = false));
+          };
         };
         $("server-select").onchange = (event) =>
           selectServer(Number(event.target.value));
@@ -1165,7 +1322,11 @@
           $("service-server").value = state.selected.id;
           if (service) {
             $("service-name").value = service.serviceName || "";
-            $("service-type").value = service.healthCheckUrl ? "SPRING_BOOT" : "OTHER";
+            const configuration = state.serverServiceConfigurations.find(
+              (item) => item.serviceId === service.id,
+            );
+            const healthCheckUrl = configuration?.healthCheckUrl || "";
+            $("service-type").value = healthCheckUrl ? "SPRING_BOOT" : "OTHER";
             const serverPaths = state.paths.filter((path) =>
               path.servers?.some((pathServer) => Number(pathServer.id) === Number(state.selected.id)),
             );
@@ -1174,9 +1335,9 @@
             const scriptsPath = paths.find((path) => path.pathName === "SCRIPTS_HOME");
             $("logs-path").value = logsPath?.pathDescription || "";
             $("scripts-path").value = scriptsPath?.pathDescription || "";
-            if (service.healthCheckUrl) {
+            if (healthCheckUrl) {
               try {
-                const url = new URL(service.healthCheckUrl);
+                const url = new URL(healthCheckUrl);
                 $("actuator-port").value = url.port || "80";
                 $("context-path").value = url.pathname.replace(/\/actuator\/health\/?$/, "");
               } catch {
@@ -1210,9 +1371,13 @@
           lastUpdatedDttm: null,
         });
         const syncServiceHealthUrls = async (previousServer, updatedServer) => {
-          for (const service of previousServer?.services || []) {
-            if (!service.healthCheckUrl) continue;
-            const url = new URL(service.healthCheckUrl);
+          for (const configuration of state.serverServiceConfigurations || []) {
+            if (!configuration.healthCheckUrl) continue;
+            const service = (previousServer?.services || []).find(
+              (item) => Number(item.id) === Number(configuration.serviceId),
+            );
+            if (!service) continue;
+            const url = new URL(configuration.healthCheckUrl);
             const host = updatedServer.ipAddress || updatedServer.hostname;
             const healthCheckUrl = `${url.protocol}//${host}${url.port ? `:${url.port}` : ""}${url.pathname}`;
             await request(`api/services/${service.id}`, {
@@ -1270,7 +1435,6 @@
                     $("context-path").value,
                   ) + "/actuator/health"
                 : "",
-            lastHealthChecked: null,
             createdDttm: null,
             lastUpdatedDttm: null,
             createdSource: "UI",
@@ -1307,6 +1471,16 @@
           const id = $("script-id").value;
           const body = { id: id ? Number(id) : null, scriptName: $("script-name").value, scriptExtension: $("script-extension").value, paths: [], createdDttm: null, lastUpdatedDttm: null, createdSource: "UI", lastUpdatedSource: "UI" };
           try { await request(id ? `api/scripts/${id}` : "api/scripts", { method: id ? "PUT" : "POST", body: JSON.stringify(body) }); $("script-modal").classList.remove("active"); await loadSettings(); notice("Script saved."); } catch (error) { notice(error.message, true); }
+        };
+        $("add-alert").onclick = () => openAlert();
+        $("refresh-alerts").onclick = () => loadAlerts();
+        $("alert-target-type").onchange = toggleAlertTarget;
+        $("alert-form").onsubmit = async (event) => {
+          event.preventDefault();
+          const id = $("alert-id").value;
+          const serverTarget = $("alert-target-type").value === "SERVER";
+          const body = { name: $("alert-name").value, targetType: $("alert-target-type").value, serverId: serverTarget ? Number($("alert-server").value) : null, serviceId: serverTarget ? null : Number($("alert-service").value), conditionType: $("alert-condition-type").value, operator: $("alert-operator").value, conditionValue: $("alert-condition-value").value, enabled: $("alert-enabled").checked };
+          try { await request(id ? `api/alerts/${id}` : "api/alerts", { method: id ? "PUT" : "POST", body: JSON.stringify(body) }); $("alert-modal").classList.remove("active"); await loadAlerts(); } catch (error) { notice(error.message, true); }
         };
         document.querySelectorAll("[data-close]").forEach(
           (button) =>

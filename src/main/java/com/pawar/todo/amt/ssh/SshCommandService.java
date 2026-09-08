@@ -34,7 +34,8 @@ public class SshCommandService {
 
 	public String execute(ServerResponseDto server, String command) throws IOException {
 		String host = resolveHost(server);
-		logger.info("Executing command on {} (user: {}): {}", host, properties.getUsername(), command);
+		logger.info("Starting SSH command on {} as {} (length={})", host, properties.getUsername(),
+				command == null ? 0 : command.length());
 
 		try (SSHClient client = connect(server);
 				Session session = client.startSession();
@@ -57,14 +58,18 @@ public class SshCommandService {
 			if (exitStatus == null || exitStatus != 0) {
 				String errorDetails = StringUtils.hasText(error) ? error.trim() : "Exit code: " + exitStatus;
 				logger.error("Remote command failed on {}: {}", host, errorDetails);
+				if (errorDetails.contains("No such file or directory") || errorDetails.contains("not found")) {
+					throw new IOException("SCRIPTS_UNAVAILABLE: Required script is unavailable on " + host + ": "
+							+ errorDetails);
+				}
 				throw new IOException("Remote command failed: " + errorDetails);
 			}
 
+			logger.info("SSH command completed on {} with {} output characters", host, output.length());
 			return output;
 		}
 		catch(Exception e) {
-			e.printStackTrace();
-			logger.error("Error executing command on {}: {}", host, e.getMessage(), e);
+			logger.error("SSH command failed on {}: {}", host, e.getMessage(), e);
 			throw new IOException("Error executing command: " + e.getMessage(), e);
 
 		}
@@ -82,7 +87,8 @@ public class SshCommandService {
 	public void stream(ServerResponseDto server, String command, Consumer<String> lineConsumer,
 			AtomicBoolean stopped) throws IOException {
 		String host = resolveHost(server);
-		logger.info("Streaming command on {} (user: {}): {}", host, properties.getUsername(), command);
+		logger.info("Starting SSH log stream on {} as {} (command length={})", host, properties.getUsername(),
+				command == null ? 0 : command.length());
 
 		try (SSHClient client = connect(server);
 				Session session = client.startSession();
@@ -91,7 +97,7 @@ public class SshCommandService {
 						new InputStreamReader(remoteCommand.getInputStream(), StandardCharsets.UTF_8))) {
 
 			String line;
-			while (!stopped.get()) {
+			while (!stopped.get() && (remoteCommand.isOpen() || reader.ready())) {
 				if (reader.ready()) {
 					line = reader.readLine();
 					if (line == null) {
@@ -107,9 +113,23 @@ public class SshCommandService {
 					}
 				}
 			}
+			if (!stopped.get()) {
+				String error = new String(remoteCommand.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+				Integer exitStatus = remoteCommand.getExitStatus();
+				if (exitStatus == null || exitStatus != 0) {
+					String errorDetails = StringUtils.hasText(error) ? error : "Exit code: " + exitStatus;
+					if (errorDetails.contains("No such file or directory") || errorDetails.contains("not found")) {
+						throw new IOException("SCRIPTS_UNAVAILABLE: Required script is unavailable on " + host + ": "
+								+ errorDetails);
+					}
+					throw new IOException("Remote command failed: " + errorDetails);
+				}
+			}
 			remoteCommand.close();
+			logger.info("SSH log stream completed for {}", host);
 		} catch (IOException exception) {
 			if (!stopped.get()) {
+				logger.error("SSH log stream failed for {}: {}", host, exception.getMessage(), exception);
 				throw exception;
 			}
 			logger.debug("Log stream closed for {}", host);

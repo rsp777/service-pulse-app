@@ -1,17 +1,29 @@
 package com.pawar.todo.amt.controller;
 
+import java.io.IOException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import com.pawar.todo.amt.response.ApiResponse;
+import com.pawar.todo.amt.exceptions.PathOperationException;
+import com.pawar.todo.amt.exceptions.ResourceNotFoundException;
 import com.pawar.todo.amt.service.ManageServices;
 
 @RestController
@@ -20,10 +32,64 @@ public class ManageServicesController {
 
 	private static final Logger logger = LoggerFactory.getLogger(ManageServicesController.class);
 	private ManageServices manageServices;
+	private final Executor serviceActionStreamExecutor;
 	
+	@Autowired
+	public ManageServicesController(@Qualifier("logStreamExecutor") Executor serviceActionStreamExecutor) {
+		this.serviceActionStreamExecutor = serviceActionStreamExecutor;
+	}
+
 	@Autowired
 	public void setManageServices(ManageServices manageServices) {
 		this.manageServices = manageServices;
+	}
+
+	@GetMapping(value = "/{action}-all-service/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+	public SseEmitter streamAllServices(@PathVariable String action, @RequestParam Integer serverId) {
+		SseEmitter emitter = new SseEmitter(0L);
+		AtomicBoolean stopped = new AtomicBoolean();
+		emitter.onCompletion(() -> stopped.set(true));
+		emitter.onTimeout(() -> stopped.set(true));
+		emitter.onError(error -> stopped.set(true));
+		try {
+			serviceActionStreamExecutor.execute(() -> {
+				try {
+					manageServices.streamAllServices(serverId, action,
+							line -> send(emitter, "output", line, stopped), stopped);
+					if (!stopped.get()) {
+						emitter.send(SseEmitter.event().name("complete").data("Lifecycle action completed"));
+						emitter.complete();
+					}
+				} catch (Exception exception) {
+					if (!stopped.get()) {
+						send(emitter, "error", scriptUnavailableMessage(exception), stopped);
+						emitter.complete();
+					}
+				}
+			});
+		} catch (RejectedExecutionException exception) {
+			emitter.completeWithError(new IllegalStateException("Too many active service actions", exception));
+		}
+		return emitter;
+	}
+
+
+	private String scriptUnavailableMessage(Exception exception) {
+		if (exception instanceof PathOperationException || exception instanceof ResourceNotFoundException) {
+			return "SCRIPTS_UNAVAILABLE: Required script configuration is unavailable for this server: "
+					+ exception.getMessage();
+		}
+		return exception.getMessage();
+	}
+	private void send(SseEmitter emitter, String eventName, String value, AtomicBoolean stopped) {
+		if (stopped.get()) {
+			return;
+		}
+		try {
+			emitter.send(SseEmitter.event().name(eventName).data(value == null ? "Unknown lifecycle error" : value));
+		} catch (IOException exception) {
+			stopped.set(true);
+		}
 	}
 
 	@PostMapping("/start-service")

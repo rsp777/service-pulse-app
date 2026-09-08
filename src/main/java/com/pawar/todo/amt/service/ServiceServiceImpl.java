@@ -36,10 +36,12 @@ import com.pawar.todo.amt.mapper.ServiceMapper;
 import com.pawar.todo.amt.model.Path;
 import com.pawar.todo.amt.model.Script;
 import com.pawar.todo.amt.model.Server;
+import com.pawar.todo.amt.model.ServerServiceConfiguration;
 import com.pawar.todo.amt.model.ServiceHealthStatus;
 import com.pawar.todo.amt.respository.PathRepository;
 import com.pawar.todo.amt.respository.ScriptRepository;
 import com.pawar.todo.amt.respository.ServerRepository;
+import com.pawar.todo.amt.respository.ServerServiceConfigurationRepository;
 import com.pawar.todo.amt.respository.ServiceHealthStatusRepository;
 import com.pawar.todo.amt.respository.ServiceRepository;
 
@@ -60,11 +62,13 @@ public class ServiceServiceImpl implements ServiceService {
 	private final PathMapper pathMapper;
 	private final ServiceCache serviceCache;
 	private final ScriptExtensionConverter scriptExtensionConverter;
+	private final ServerServiceConfigurationRepository serverServiceConfigurationRepository;
 
 	public ServiceServiceImpl(ServerRepository serverRepository, ServiceRepository serviceRepository,
 			ServiceHealthStatusRepository serviceHealthStatusRepository, PathRepository pathRepository,
 			ScriptRepository scriptRepository, ServiceMapper serviceMapper, ScriptMapper scriptMapper,
-			PathMapper pathMapper, ServiceCache serviceCache, ScriptExtensionConverter scriptExtensionConverter) {
+			PathMapper pathMapper, ServiceCache serviceCache, ScriptExtensionConverter scriptExtensionConverter,
+			ServerServiceConfigurationRepository serverServiceConfigurationRepository) {
 		this.serverRepository = serverRepository;
 		this.serviceRepository = serviceRepository;
 		this.serviceHealthStatusRepository = serviceHealthStatusRepository;
@@ -75,6 +79,7 @@ public class ServiceServiceImpl implements ServiceService {
 		this.pathMapper = pathMapper;
 		this.serviceCache = serviceCache;
 		this.scriptExtensionConverter = scriptExtensionConverter;
+		this.serverServiceConfigurationRepository = serverServiceConfigurationRepository;
 	}
 
 	@Override
@@ -89,7 +94,6 @@ public class ServiceServiceImpl implements ServiceService {
 			logger.info("Creating new service: {}", request.serviceName());
 
 			com.pawar.todo.amt.model.Service service = new com.pawar.todo.amt.model.Service();
-			ServiceHealthStatus serviceHealthStatus = new ServiceHealthStatus();
 
 			Set<ServerResponseDto> serverResponseDtoDtos = request.servers();
 			Set<Server> servers = new HashSet<>();
@@ -101,28 +105,36 @@ public class ServiceServiceImpl implements ServiceService {
 					Optional<Server> serverOptional = serverRepository.findById(serverResponseDto.id());
 					logger.info("serverOptional : {}",serverOptional);
 					if (serverOptional.isPresent()) {
-						servers.add(serverOptional.get());
-						serverOptional.get().getServices().add(service);
+						Server server = serverOptional.get();
+						servers.add(server);
+						if (server.getServices() == null) {
+							server.setServices(new HashSet<>());
+						}
+						server.getServices().add(service);
 					}
 				}
 				logger.info("servers : {}",servers);
 				service.setServers(servers);
 			}
 			service.setServiceName(request.serviceName());
-			service.setHealthCheckUrl(request.healthCheckUrl());
 			service.setCreatedSource(request.createdSource());
 			service.setLastUpdatedSource(request.lastUpdatedSource());
 			service.setCreatedDttm(LocalDateTime.now());
 			service.setLastUpdatedDttm(LocalDateTime.now());
 			logger.info("service : {}",service);
 			com.pawar.todo.amt.model.Service savedService = serviceRepository.save(service);
+			upsertServerConfigurations(savedService, servers, request.healthCheckUrl());
 			logger.debug("Service created successfully: ID={}", savedService.getId());
 			if (savedService != null) {
-				serviceHealthStatus.setService(service);
-				serviceHealthStatus.setStatus(HealthCheckStatus.UNKNOWN);
-				serviceHealthStatus.setCreatedSource(service.getCreatedSource());
-				serviceHealthStatus.setLastUpdatedSource(service.getLastUpdatedSource());
-				serviceHealthStatusRepository.save(serviceHealthStatus);
+				for (Server server : servers) {
+					ServiceHealthStatus serviceHealthStatus = new ServiceHealthStatus();
+					serviceHealthStatus.setService(savedService);
+					serviceHealthStatus.setServer(server);
+					serviceHealthStatus.setStatus(HealthCheckStatus.UNKNOWN);
+					serviceHealthStatus.setCreatedSource(service.getCreatedSource());
+					serviceHealthStatus.setLastUpdatedSource(service.getLastUpdatedSource());
+					serviceHealthStatusRepository.save(serviceHealthStatus);
+				}
 			}
 			return serviceMapper.toDto(savedService);
 		} catch (Exception e) {
@@ -193,19 +205,23 @@ public class ServiceServiceImpl implements ServiceService {
 
 			Set<ServerResponseDto> serverRequestDtos = request.servers();
 			Set<Server> servers = new HashSet<>();
+			Set<Server> requestedServers = new HashSet<>();
+			servers.addAll(Optional.ofNullable(service.getServers()).orElseGet(HashSet::new));
 
-			if (!serverRequestDtos.isEmpty()) {
+			if (serverRequestDtos != null && !serverRequestDtos.isEmpty()) {
 				for (Iterator iterator = serverRequestDtos.iterator(); iterator.hasNext();) {
 					ServerResponseDto serverResponseDto = (ServerResponseDto) iterator.next();
 					Optional<Server> serverOptional = serverRepository.findById(serverResponseDto.id());
 					if (serverOptional.isPresent()) {
-						servers.add(serverOptional.get());
+						Server requestedServer = serverOptional.get();
+						servers.add(requestedServer);
+						requestedServers.add(requestedServer);
 					}
 				}
 				service.setServers(servers);
 			}
 			service.setServiceName(request.serviceName());
-			service.setHealthCheckUrl(request.healthCheckUrl());
+			upsertServerConfigurations(service, requestedServers, request.healthCheckUrl());
 			service.setLastUpdatedDttm(LocalDateTime.now());
 
 			com.pawar.todo.amt.model.Service updatedService = serviceRepository.save(service);
@@ -219,12 +235,28 @@ public class ServiceServiceImpl implements ServiceService {
 		}
 	}
 
+	private void upsertServerConfigurations(com.pawar.todo.amt.model.Service service, Set<Server> servers,
+			String healthCheckUrl) {
+		for (Server server : servers) {
+			ServerServiceConfiguration configuration = serverServiceConfigurationRepository
+					.findByServerIdAndServiceId(server.getId(), service.getId())
+					.orElseGet(ServerServiceConfiguration::new);
+			configuration.setServer(server);
+			configuration.setService(service);
+			configuration.setHealthCheckUrl(healthCheckUrl);
+			configuration.setCreatedSource(service.getCreatedSource());
+			configuration.setLastUpdatedSource(service.getLastUpdatedSource());
+			serverServiceConfigurationRepository.save(configuration);
+		}
+	}
+
 	@Override
 	@Async
 	@Transactional
 	public ListenableFuture<Void> deleteServiceAsync(Integer id) throws ServiceOperationException {
 		try {
 			logger.info("Async deletion initiated for service ID: {}", id);
+			serverServiceConfigurationRepository.deleteByServiceId(id);
 			serviceRepository.deleteById(id);
 			serviceCache.evict(id);
 			logger.debug("Async deletion completed for service ID: {}", id);
