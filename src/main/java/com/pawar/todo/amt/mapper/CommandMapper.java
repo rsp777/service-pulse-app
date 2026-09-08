@@ -68,6 +68,7 @@ public class CommandMapper {
 		logger.info("Populating Command entity from CommandResponseDto: {}", dto);
 		command.setName(dto.name());
 		command.setDescription(dto.description());
+		command.setParameters(dto.parameters());
 		command.setStatus(commandStatusConverter.toEnum(dto.status()));
 		command.setResult(dto.result());
 		command.setCreatedDttm(dto.createdDttm());

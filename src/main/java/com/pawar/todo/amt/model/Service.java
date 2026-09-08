@@ -5,20 +5,16 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import lombok.AllArgsConstructor;
@@ -46,16 +42,6 @@ public class Service {
 	@JsonProperty("serviceName")
 	@Column(name = "serviceName")
 	private String serviceName;
-
-	@JsonProperty("healthCheckUrl")
-	@Column(name = "healthCheckUrl")
-	private String healthCheckUrl;
-
-	@JsonInclude(value = Include.CUSTOM)
-	@JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
-	@JsonProperty("lastHealthChecked")
-	@Column(name = "lastHealthChecked")
-	private LocalDateTime lastHealthChecked;
 
 	@JsonInclude(value = Include.CUSTOM)
 	@JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
@@ -98,8 +84,7 @@ public class Service {
 			return false;
 		Service other = (Service) obj;
 		return Objects.equals(createdDttm, other.createdDttm) && Objects.equals(createdSource, other.createdSource)
-				&& Objects.equals(healthCheckUrl, other.healthCheckUrl) && Objects.equals(id, other.id)
-				&& Objects.equals(lastHealthChecked, other.lastHealthChecked)
+				&& Objects.equals(id, other.id)
 				&& Objects.equals(lastUpdatedDttm, other.lastUpdatedDttm)
 				&& Objects.equals(lastUpdatedSource, other.lastUpdatedSource)
 				&& Objects.equals(serviceName, other.serviceName);
@@ -107,7 +92,7 @@ public class Service {
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(createdDttm, createdSource, healthCheckUrl, id, lastHealthChecked, lastUpdatedDttm,
+		return Objects.hash(createdDttm, createdSource, id, lastUpdatedDttm,
 				lastUpdatedSource, serviceName);
 	}
 	

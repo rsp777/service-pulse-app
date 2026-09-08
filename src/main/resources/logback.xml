@@ -1,11 +1,13 @@
 <!DOCTYPE logback>
 <configuration>
+    <property name="LOG_PATTERN" value="%date{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%thread] %-5level %logger{40} - %msg%n" />
+
     <!-- Suppress Logback internal logging -->
     <logger name="ch.qos.logback" level="WARN" />
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%date{yyyy-MM-dd HH:mm:ss} [%thread] %level %logger{0} - %msg \(%file:%line\)%n</pattern>
+            <pattern>${LOG_PATTERN}</pattern>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>INFO</level>
@@ -19,7 +21,7 @@
             <maxHistory>7</maxHistory>
         </rollingPolicy>
         <encoder>
-            <pattern>%date{yyyy-MM-dd HH:mm:ss} [%thread] %level %logger{0} - %msg \(%file:%line\)%n</pattern>
+            <pattern>${LOG_PATTERN}</pattern>
         </encoder>
     </appender>
 
@@ -31,16 +33,26 @@
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder>
-            <pattern>%date{yyyy-MM-dd HH:mm:ss} [%thread] %level %logger{0} - %msg \(%file:%line\)%n</pattern>
+            <pattern>${LOG_PATTERN}</pattern>
         </encoder>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
     </appender>
 
-    <logger name="com.yourpackage" level="ERROR" additivity="false">
-        <appender-ref ref="ERROR_FILE" />
+    <logger name="org.springframework" level="WARN" />
+    <logger name="org.hibernate.SQL" level="WARN" />
+    <logger name="org.hibernate.orm.jdbc.bind" level="WARN" />
+
+    <logger name="com.pawar.todo.amt" level="INFO" />
+
+    <logger name="AUDIT_LOGGER" level="INFO" additivity="false">
+        <appender-ref ref="FILE" />
     </logger>
 
     <root level="INFO" additivity="false">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="FILE" />
+        <appender-ref ref="ERROR_FILE" />
     </root>
 </configuration>

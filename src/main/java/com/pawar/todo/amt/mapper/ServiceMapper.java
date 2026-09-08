@@ -80,12 +80,6 @@ public class ServiceMapper {
 			}
 		}
 
-		service.setHealthCheckUrl(dto.healthCheckUrl());
-		logger.debug("Set healthCheckUrl: {}", dto.healthCheckUrl());
-
-		service.setLastHealthChecked(dto.lastHealthChecked());
-		logger.debug("Updated lastHealthChecked to: {}", dto.lastHealthChecked());
-
 		service.setCreatedDttm(dto.createdDttm());
 		service.setLastUpdatedDttm(dto.lastUpdatedDttm());
 		service.setCreatedSource(dto.createdSource());
@@ -109,12 +103,6 @@ public class ServiceMapper {
 			service.setServers(servers);
 			logger.debug("Set servers: {}", servers);
 		}
-
-		service.setHealthCheckUrl(dto.healthCheckUrl());
-		logger.debug("Set healthCheckUrl: {}", dto.healthCheckUrl());
-
-		service.setLastHealthChecked(dto.lastHealthChecked());
-		logger.debug("Updated lastHealthChecked to: {}", dto.lastHealthChecked());
 
 		service.setCreatedDttm(dto.createdDttm());
 		service.setLastUpdatedDttm(dto.lastUpdatedDttm());
@@ -146,7 +134,7 @@ public class ServiceMapper {
 //		}
 
 		ServiceResponseDto dto = new ServiceResponseDto(entity.getId(), null, entity.getServiceName(),
-				entity.getHealthCheckUrl(), entity.getLastHealthChecked(), entity.getCreatedDttm(),
+				entity.getCreatedDttm(),
 				entity.getLastUpdatedDttm(), entity.getCreatedSource(), entity.getLastUpdatedSource());
 
 		logger.debug("Created ServiceResponseDto with values: {}", String.format("id=%s, ServiceName=%s, Servers=%s",
@@ -191,7 +179,7 @@ public class ServiceMapper {
 			}
 		}
 		ServiceRequestDto dto = new ServiceRequestDto(entity.getId(), serverResponseDtos, entity.getServiceName(),
-				entity.getHealthCheckUrl(), entity.getLastHealthChecked(), entity.getCreatedDttm(),
+				null, entity.getCreatedDttm(),
 				entity.getLastUpdatedDttm(), entity.getCreatedSource(), entity.getLastUpdatedSource());
 
 		logger.debug("Created ServiceResponseDto with values: {}", String.format("id=%s, ServiceName=%s, Servers=%s",

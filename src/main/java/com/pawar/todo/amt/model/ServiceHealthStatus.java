@@ -19,10 +19,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Data;
 
 @Data
 @Entity
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = { "server_id", "service_id" }))
 public class ServiceHealthStatus {
 
     @Id
@@ -33,6 +36,10 @@ public class ServiceHealthStatus {
     @ManyToOne
     @JoinColumn(name = "service_id", nullable = false)
     private Service service; // Reference to the associated service
+
+    @ManyToOne
+    @JoinColumn(name = "server_id")
+    private Server server;
 
     @Enumerated(EnumType.STRING)
     @JsonProperty("status")

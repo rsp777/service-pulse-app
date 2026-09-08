@@ -8,8 +8,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,8 +44,13 @@ import com.pawar.todo.amt.mapper.ServerMapper;
 import com.pawar.todo.amt.mapper.ServiceHealthStatusMapper;
 import com.pawar.todo.amt.mapper.ServiceMapper;
 import com.pawar.todo.amt.model.Command;
+import com.pawar.todo.amt.model.Server;
 import com.pawar.todo.amt.model.ServiceHealthStatus;
 import com.pawar.todo.amt.respository.ServiceRepository;
+import com.pawar.todo.amt.respository.ServiceHealthStatusRepository;
+import com.pawar.todo.amt.respository.ServerServiceConfigurationRepository;
+import com.pawar.todo.amt.respository.ApplicationConfigurationRepository;
+import com.pawar.todo.amt.model.ApplicationConfiguration;
 import com.pawar.todo.amt.ssh.SshCommandService;
 
 import lombok.extern.slf4j.Slf4j;
@@ -61,18 +69,35 @@ public class ManageServicesImpl implements ManageServices {
 	private ServiceHealthStatusMapper serviceHealthStatusMapper;
 	private ServiceMapper serviceMapper;
 	private final HttpService httpService;
+	private final AlertConfigurationService alertConfigurationService;
 
 	private PathService pathService;
 
 	@Autowired
 	private ServiceRepository serviceRepository;
 
+	@Value("${healthcheck.enabled:true}")
+	private boolean healthCheckEnabled = true;
+
+	@Value("${service-management.enabled:true}")
+	private boolean serviceManagementEnabled = true;
+
+	@Autowired
+	private ApplicationConfigurationRepository applicationConfigurationRepository;
+
+	@Autowired
+	private ServiceHealthStatusRepository serviceHealthStatusRepository;
+
+	@Autowired
+	private ServerServiceConfigurationRepository serverServiceConfigurationRepository;
+
 	public ManageServicesImpl(SshCommandService sshCommandService,
 			ScriptExtensionConverter scriptExtensionConverter,
-			HttpService httpService) {
+			HttpService httpService, AlertConfigurationService alertConfigurationService) {
 		this.sshCommandService = sshCommandService;
 		this.scriptExtensionConverter = scriptExtensionConverter;
 		this.httpService = httpService;
+		this.alertConfigurationService = alertConfigurationService;
 	}
 
 	@Autowired
@@ -117,16 +142,13 @@ public class ManageServicesImpl implements ManageServices {
 
 	}
 
-	// @Autowired
-	// public void setServerMapper(ServerMapper serverMapper) {
-	// this.serverMapper = serverMapper;
-
-	// }
-
 	@Override
 	public String startService(Integer serverId, Integer serviceId) throws AgentOperationException,
 			ServiceOperationException, IOException, ServiceHealthStatusOperationException, PathOperationException,
 			ResourceNotFoundException {
+		if (!runtimeFlag("service-management.enabled", serviceManagementEnabled)) {
+			return "Service management is disabled";
+		}
 		ServerResponseDto server = getServer(serverId);
 		ServiceResponseDto service = serviceService.findServiceById(serviceId)
 				.orElseThrow(() -> new ServiceOperationException("Service not found"));
@@ -198,103 +220,14 @@ public class ManageServicesImpl implements ManageServices {
 	private String getPathAndScript(String scriptsHome, String scriptName)
 			throws PathOperationException, ResourceNotFoundException {
 		String path = pathService.findByPathName(scriptsHome)
-				.orElseThrow(() -> new PathOperationException("Path not found: " + scriptsHome)).pathDescription();
+				.orElseThrow(() -> new PathOperationException("Path not found: " + scriptsHome)).pathName();
 		Optional<ScriptResponseDto> scriptOptional = scriptService.findScriptByScriptName(scriptName);
 		ScriptResponseDto script = scriptOptional
 				.orElseThrow(() -> new ResourceNotFoundException("Script not found: " + scriptName));
 		String scriptName1 = script.scriptName();
 		ScriptExtension scriptExtension = scriptExtensionConverter.toEnum(script.scriptExtension());
-		return String.format("%s/%s%s", path, scriptName1, scriptExtension.getExtension());
+		return String.format("%s/%s%s", "$" + path, scriptName1, scriptExtension.getExtension());
 	}
-
-	// private String startStopCommand(Integer agentId, ServiceResponseDto service)
-	// {
-	// String path = pathService.findByPathName("SCRIPTS_HOME").get().pathName();
-	// String scriptName = extractScriptName(service.servers());
-	// return String.format("$%s/%s %s", path, scriptName, service.serviceName());
-	// }
-
-	// private String buildStartAllCommand() throws PathOperationException,
-	// ResourceNotFoundException {
-	// String path = pathService.findByPathName("SCRIPTS_HOME").get().pathName();
-	// Optional<ScriptResponseDto> scriptOptional =
-	// scriptService.findScriptByScriptName("startAll");
-	// String scriptName = scriptOptional.get().scriptName();
-	// ScriptExtension scriptExtension =
-	// scriptExtensionConverter.toEnum(scriptOptional.get().scriptExtension());
-	// return String.format("$%s/%s%s", path, scriptName,
-	// scriptExtension.getExtension());
-	// }
-	//
-	// private String buildStopAllCommand() throws PathOperationException,
-	// ResourceNotFoundException {
-	// String path = pathService.findByPathName("SCRIPTS_HOME").get().pathName();
-	// Optional<ScriptResponseDto> scriptOptional =
-	// scriptService.findScriptByScriptName("stopAll");
-	// String scriptName = scriptOptional.get().scriptName();
-	// ScriptExtension scriptExtension =
-	// scriptExtensionConverter.toEnum(scriptOptional.get().scriptExtension());
-	// return String.format("$%s/%s%s", path, scriptName,
-	// scriptExtension.getExtension());
-	// }
-
-	// private String buildStartCommand(ServiceResponseDto service) throws
-	// IOException, AgentOperationException {
-	// String path = extractScriptPath(service.servers());
-	// String scriptName = extractScriptName(service.servers());
-	// return String.format("$%s/%s %s", path, scriptName, service.serviceName());
-	// }
-	//
-	// private String buildStopCommand(ServiceResponseDto service, ScriptResponseDto
-	// script)
-	// throws IOException, AgentOperationException {
-	// String path = extractScriptPath(service.servers());
-	// ScriptExtension scriptExtension =
-	// scriptExtensionConverter.toEnum(script.scriptExtension());
-	// return String.format("$%s/%s%s %s", path, script.scriptName(),
-	// scriptExtension.getExtension(),
-	// service.serviceName());
-	// }
-
-	// private String extractPathOrScript(Set<ServerResponseDto> serverResponsedtos,
-	// String targetName, boolean isPath)
-	// throws IOException, AgentOperationException {
-	// for (ServerResponseDto serverResponseDto : serverResponsedtos) {
-	// Set<PathResponseDto> pathResponseDtos = serverResponseDto.paths();
-	// for (PathResponseDto pathResponseDto : pathResponseDtos) {
-	// if (isPath) {
-	// // Check for path
-	// if (pathResponseDto.pathName().equals(targetName)) {
-	// return "$" + pathResponseDto.pathName(); // Return formatted path
-	// }
-	// } else {
-	// // Check for script
-	// Set<ScriptResponseDto> scriptResponseDtos = pathResponseDto.scripts();
-	// for (ScriptResponseDto scriptResponseDto : scriptResponseDtos) {
-	// if (scriptResponseDto.scriptName().equals(targetName)
-	// && scriptResponseDto.scriptExtension().equals("SH")) {
-	// return scriptResponseDto.scriptName() + scriptResponseDto.scriptExtension();
-	// // Return
-	// // script
-	// // name with
-	// // extension
-	// }
-	// }
-	// }
-	// }
-	// }
-	// return null; // Return null if not found
-	// }
-	//
-	// private String extractScriptPath(Set<ServerResponseDto> serverResponsedtos)
-	// throws IOException, AgentOperationException {
-	// return extractPathOrScript(serverResponsedtos, "SCRIPTS_HOME", true);
-	// }
-	//
-	// private String extractScriptName(Set<ServerResponseDto> serverResponsedtos)
-	// throws IOException, AgentOperationException {
-	// return extractPathOrScript(serverResponsedtos, "start", false);
-	// }
 
 	private void updateServiceHealthStatus(ServiceHealthStatusResponseDto serviceHealthStatus, String status,
 			String lastUpdateSource) throws ServiceHealthStatusOperationException {
@@ -341,6 +274,9 @@ public class ManageServicesImpl implements ManageServices {
 	@Override
 	public String stopAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException,
 			ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
+		if (!runtimeFlag("service-management.enabled", serviceManagementEnabled)) {
+			return "Service management is disabled";
+		}
 		ServerResponseDto server = getServer(serverId);
 
 		log.info("Server: {}", server);
@@ -366,6 +302,45 @@ public class ManageServicesImpl implements ManageServices {
 		return startAllServices(serverId);
 	}
 
+	@Override
+	public void streamAllServices(Integer serverId, String action, Consumer<String> lineConsumer, AtomicBoolean stopped)
+			throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException,
+			ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
+		if (!runtimeFlag("service-management.enabled", serviceManagementEnabled)) {
+			lineConsumer.accept("Service management is disabled");
+			return;
+		}
+		ServerResponseDto server = getServer(serverId);
+		if (!ServerStatus.ONLINE.toString().equals(server.status())) {
+			lineConsumer.accept("Server is OFFLINE");
+			return;
+		}
+		if ("restart".equals(action)) {
+			streamBulkCommand(server, "stopAll", lineConsumer, stopped);
+			if (!stopped.get()) {
+				streamBulkCommand(server, "startAll", lineConsumer, stopped);
+			}
+			return;
+		}
+		if (!"start".equals(action) && !"stop".equals(action)) {
+			throw new IllegalArgumentException("Unsupported service action: " + action);
+		}
+		streamBulkCommand(server, action + "All", lineConsumer, stopped);
+	}
+
+	private void streamBulkCommand(ServerResponseDto server, String scriptName, Consumer<String> lineConsumer,
+			AtomicBoolean stopped)
+			throws IOException, PathOperationException, ResourceNotFoundException, AgentOperationException,
+			ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
+		String status = scriptName.startsWith("start") ? "UP" : "DOWN";
+		String command = startStopCommand(null, "SCRIPTS_HOME", scriptName);
+		log.info("Streaming command: {}", command);
+		sshCommandService.stream(server, command, lineConsumer, stopped);
+		if (!stopped.get()) {
+			updateAllServiceHealthStatus(server.id(), status, scriptName + "Services");
+		}
+	}
+
 	public boolean isServiceRunning(Integer serverId, String serviceName) {
 		try {
 
@@ -374,6 +349,7 @@ public class ManageServicesImpl implements ManageServices {
 
 			String isServiceRunningCmd = commandResponseDto.name() + " " + commandResponseDto.parameters() + " "
 					+ serviceName;
+			log.info("isServiceRunningCmd : {}", isServiceRunningCmd);
 			ServerResponseDto server = getServer(serverId);
 			String response = sshCommandService.execute(server, isServiceRunningCmd).trim().toLowerCase();
 			log.info("Service: {}, Response: {}", serviceName, response);
@@ -388,7 +364,8 @@ public class ManageServicesImpl implements ManageServices {
 
 	// Method to update health status for all services
 	private void updateAllServiceHealthStatus(Integer serverId, String status, String lastUpdatedSource)
-			throws AgentOperationException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
+			throws AgentOperationException, ServiceHealthStatusOperationException, InterruptedException,
+			ExecutionException {
 		ServerResponseDto server = getServer(serverId);
 		for (ServiceResponseDto service : Optional.ofNullable(server.services()).orElse(Set.of())) {
 			ServiceHealthStatusResponseDto healthStatus = getOrCreateHealthStatus(service);
@@ -406,8 +383,8 @@ public class ManageServicesImpl implements ManageServices {
 		}
 		ServiceRequestDto serviceRequest = serviceMapper.reqToDto(serviceMapper.toEntity(service));
 		return serviceHealthStatusService.createServiceHealthStatus(new ServiceHealthStatusRequestDto(
-					null, serviceRequest, "UNKNOWN", LocalDateTime.now(), null, null, null, LocalDateTime.now(),
-					"SERVICE_MANAGEMENT", "SERVICE_MANAGEMENT"));
+				null, serviceRequest, "UNKNOWN", LocalDateTime.now(), null, null, null, LocalDateTime.now(),
+				"SERVICE_MANAGEMENT", "SERVICE_MANAGEMENT"));
 	}
 
 	@Override
@@ -415,30 +392,46 @@ public class ManageServicesImpl implements ManageServices {
 	@Scheduled(cron = "${healthcheck.cron}")
 	@Transactional
 	public void periodicServiceHealthCheck() {
+		if (!runtimeFlag("healthcheck.enabled", healthCheckEnabled)) {
+			log.debug("Scheduled service health checks are disabled");
+			return;
+		}
 		try {
 			CompletableFuture<List<ServiceResponseDto>> services = serviceService.findAllServicesAsync();
 			for (ServiceResponseDto serviceResponseDto : services.get()) {
-				boolean connectionStatus = false;
 				com.pawar.todo.amt.model.Service existingService = serviceRepository.findById(serviceResponseDto.id())
 						.orElseThrow(() -> new ResourceNotFoundException(
 								"Service not found with ID: " + serviceResponseDto.id()));
-				connectionStatus = isServiceRunning(existingService.getHealthCheckUrl());
-				Optional<ServiceHealthStatusResponseDto> serviceHealthStatus = serviceHealthStatusService
-						.findServiceHealthStatusByServiceId(serviceResponseDto.id());
-				ServiceHealthStatus healthStatus = serviceHealthStatusMapper.toEntity(serviceHealthStatus.get());
-				log.info("connectionStatus : {}", connectionStatus);
-				if (connectionStatus) {
-					healthStatus.setStatus(HealthCheckStatus.UP);
-
-				} else {
-					healthStatus.setStatus(HealthCheckStatus.DOWN);
+				for (Server server : Optional.ofNullable(existingService.getServers()).orElse(Set.of())) {
+					Optional<String> configuredHealthCheckUrl = serverServiceConfigurationRepository
+							.findByServerIdAndServiceId(server.getId(), existingService.getId())
+							.map(configuration -> configuration.getHealthCheckUrl());
+					if (configuredHealthCheckUrl.isEmpty() || configuredHealthCheckUrl.get().isBlank()) {
+						log.warn(
+								"Skipping health check: no server-specific URL configured for serverId={}, serviceId={}",
+								server.getId(), existingService.getId());
+						continue;
+					}
+					ServiceHealthStatus healthStatus = serviceHealthStatusRepository
+							.findByServiceIdAndServerId(existingService.getId(), server.getId())
+							.orElseGet(ServiceHealthStatus::new);
+					healthStatus.setService(existingService);
+					healthStatus.setServer(server);
+					long healthCheckStarted = System.nanoTime();
+					boolean serviceUp = isServiceRunning(configuredHealthCheckUrl.get());
+					healthStatus.setResponseTime((System.nanoTime() - healthCheckStarted) / 1_000_000);
+					log.info("Health check completed: serverId={}, serviceId={}, status={}", server.getId(),
+							existingService.getId(), serviceUp ? HealthCheckStatus.UP : HealthCheckStatus.DOWN);
+					healthStatus.setStatus(serviceUp ? HealthCheckStatus.UP : HealthCheckStatus.DOWN);
+					healthStatus.setTimestamp(LocalDateTime.now());
+					healthStatus.setLastUpdatedDttm(LocalDateTime.now());
+					healthStatus.setLastUpdatedSource("PERIODIC_HEALTH_CHECK");
+					serviceHealthStatusRepository.save(healthStatus);
+					if (runtimeFlag("alert-management.enabled", true)) {
+						alertConfigurationService.evaluate(server.getId(), existingService.getId(),
+								healthStatus.getStatus().name(), healthStatus.getResponseTime());
+					}
 				}
-				healthStatus.setTimestamp(LocalDateTime.now());
-				healthStatus.setLastUpdatedDttm(LocalDateTime.now());
-				healthStatus.setLastUpdatedSource("PERIODIC_HEALTH_CHECK");
-
-				ServiceHealthStatusResponseDto healthStatusResponseDto = serviceHealthStatusMapper.toDto(healthStatus);
-				serviceHealthStatusService.updateServiceHealthStatus(serviceResponseDto.id(), healthStatusResponseDto);
 			}
 		} catch (Exception e) {
 			log.error("Error during periodic service health status check", e);
@@ -462,6 +455,14 @@ public class ManageServicesImpl implements ManageServices {
 
 		return isServiceRunning;
 
+	}
+
+	private boolean runtimeFlag(String key, boolean fallback) {
+		if (applicationConfigurationRepository == null) {
+			return fallback;
+		}
+		return applicationConfigurationRepository.findById(key).map(configuration -> configuration.getValue())
+				.map(Boolean::parseBoolean).orElse(fallback);
 	}
 
 }
