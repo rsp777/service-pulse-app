@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 import com.pawar.todo.amt.service.UiActionService;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 @Controller
 public class UniversalScreenController {
 
@@ -17,8 +19,9 @@ public class UniversalScreenController {
     }
 
     @GetMapping("/dashboard/{viewContext}")
-    public String renderDashboard(@PathVariable String viewContext, Model model) {
+    public String renderDashboard(@PathVariable String viewContext, Model model, HttpServletRequest request) {
         model.addAttribute("viewContext", viewContext);
+        model.addAttribute("contextPath", request.getContextPath());
         model.addAttribute("dashboardActions", uiActionService.getGroupedActions(viewContext));
         return "generic-screen";
     }

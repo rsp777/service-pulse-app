@@ -18,7 +18,7 @@
         @media (max-width: 800px) { .sidebar, .content, .span-4, .span-6 { grid-column: span 12; } }
     </style>
 </head>
-<body>
+<body th:attr="data-context-path=${contextPath}">
     <div class="drift-alert" th:if="${driftDetected}" role="alert">Dashboard configuration changed. Restart the application or flush the SDUI cache at /api/admin/cache/clear before continuing.</div>
     <main>
         <h1 th:text="${viewContext}">Dashboard</h1>
@@ -36,10 +36,39 @@
         </div>
     </main>
     <script>
+        const terminal = document.getElementById('apm-terminal');
+        const contextPath = document.body.dataset.contextPath || '';
+        const toast = (icon, title) => Swal.fire({ toast: true, position: 'top-end', icon, title, showConfirmButton: false, timer: 3500 });
+        const endpointUrl = (endpoint) => {
+            if (!endpoint) throw new Error('No endpoint is configured for this action');
+            if (/^https?:\/\//i.test(endpoint)) return endpoint;
+            return `${contextPath}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+        };
+        const appendOutput = (value) => {
+            terminal.textContent += `${terminal.textContent ? '\n' : ''}${value}`;
+            terminal.scrollTop = terminal.scrollHeight;
+        };
+        const streamAction = (url) => {
+            terminal.textContent = '';
+            const stream = new EventSource(url);
+            stream.addEventListener('log', event => appendOutput(event.data));
+            stream.addEventListener('output', event => appendOutput(event.data));
+            stream.addEventListener('complete', event => { appendOutput(event.data); stream.close(); toast('success', event.data); });
+            stream.addEventListener('error', () => { stream.close(); toast('error', 'Action stream ended unexpectedly'); });
+        };
         document.querySelectorAll('.action').forEach((button) => button.addEventListener('click', async () => {
-            const terminal = document.getElementById('apm-terminal'); terminal.textContent = 'Executing ' + button.textContent + '...';
-            try { const response = await fetch(button.dataset.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: button.dataset.payload || null }); const result = await response.json(); terminal.textContent = result.data || result.message || 'Command completed'; Swal.fire({ toast: true, position: 'top-end', icon: result.success ? 'success' : 'error', title: result.message, showConfirmButton: false, timer: 3500 }); }
-            catch (error) { terminal.textContent = error.message; Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Action failed', showConfirmButton: false, timer: 3500 }); }
+            try {
+                const url = endpointUrl(button.dataset.endpoint);
+                if (url.includes('/stream')) { streamAction(url); return; }
+                terminal.textContent = `Executing ${button.textContent}...`;
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: button.dataset.payload || null });
+                const result = await response.json();
+                terminal.textContent = result.data || result.message || 'Command completed';
+                toast(result.success ? 'success' : 'error', result.message || 'Action completed');
+            } catch (error) {
+                terminal.textContent = error.message;
+                toast('error', 'Action failed');
+            }
         }));
     </script>
 </body>
