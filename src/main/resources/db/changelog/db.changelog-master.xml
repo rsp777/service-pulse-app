@@ -1,0 +1,38 @@
+<?xml version="1.1" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="2-server-service-configuration" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V2__server_service_configuration.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="3-alert-management" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V3__alert_management.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="4-ui-actions" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V4__screen_definitions.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="5-ui-action-components" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V5__ui_action_components.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="6-seed-service-pulse-sdui" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V6__seed_service_pulse_sdui.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="7-sdui-crud-screens" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V7__sdui_crud_screens.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="8-sdui-crud-api" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V8__sdui_crud_api.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="9-alert-condition-management" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V9__alert_condition_management.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+</databaseChangeLog>

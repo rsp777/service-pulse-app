@@ -31,7 +31,7 @@ class UiActionCacheDriftMonitorTest {
                 .thenReturn(List.of(databaseAction));
 
         UiActionCacheDriftMonitor monitor = new UiActionCacheDriftMonitor(repository,
-                new UiActionService(repository), cacheManager);
+                new UiActionService(repository, cacheManager, null), cacheManager);
         monitor.detectDrift();
 
         assertTrue(monitor.isDriftDetected());

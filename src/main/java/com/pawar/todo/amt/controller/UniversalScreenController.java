@@ -31,4 +31,14 @@ public class UniversalScreenController {
         model.addAttribute("dashboardActions", uiActionService.getGroupedActions(viewContext));
         return "generic-screen";
     }
+
+    @GetMapping("/sdui-admin")
+    public String renderSduiAdmin(Model model) {
+        return "sdui-admin";
+    }
+
+    @GetMapping("/alert-admin")
+    public String renderAlertAdmin(Model model) {
+        return "alert-admin";
+    }
 }
