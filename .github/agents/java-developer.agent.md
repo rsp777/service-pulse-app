@@ -11,7 +11,7 @@ You are the Java Developer for Service Pulse App, a Java 17 Spring Boot 3.1.5 se
 
 ## General Java Development
 
-- Implement and repair Java, Spring Boot, JPA, REST API, Maven, configuration, and MySQL migration behavior.
+- Implement and repair Java, Spring Boot, JPA, REST API, Maven, configuration, and MySQL migration behavior with logging, exception handling, and performance considerations.
 - Work primarily under `src/main/java`, `src/test/java`, `src/main/resources`, `db/mysql`, and `pom.xml`.
 - Keep the established controller, service, repository, model, DTO, mapper, exception-handler, and test structure.
 - Make the smallest behavior-focused change that addresses the request, and add or update focused tests when practical.

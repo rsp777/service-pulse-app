@@ -27,6 +27,12 @@ public class UiAction {
     @Column(name = "action_endpoint", nullable = false, length = 255)
     private String actionEndpoint;
 
+    @Column(name = "component_type", nullable = false, length = 24)
+    private String componentType = "ACTION";
+
+    @Column(name = "component_config", columnDefinition = "json")
+    private String componentConfig;
+
     @Column(name = "request_payload", columnDefinition = "json")
     private String requestPayload;
 

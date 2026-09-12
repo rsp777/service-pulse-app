@@ -23,12 +23,17 @@
     <main>
         <h1 th:text="${viewContext}">Dashboard</h1>
         <div class="dashboard">
-            <aside class="sidebar"><h2>Operations</h2><ul><li th:each="category : ${dashboardActions.keySet()}" th:text="${category}">Category</li></ul></aside>
+            <aside class="sidebar"><h2>Service Pulse</h2><ul><li th:each="context : ${dashboardContexts}"><a th:href="@{/dashboard/{context}(context=${context})}" th:text="${context}">Dashboard</a></li></ul></aside>
             <section class="content">
                 <section class="panel" th:each="category : ${dashboardActions}">
                     <h2 th:text="${category.key}">Category</h2>
                     <section th:each="panel : ${category.value}"><h3 th:text="${panel.key}">Panel</h3>
-                        <div class="actions"><button class="action" th:each="action : ${panel.value}" th:classappend="${' ' + action.gridSpan}" th:attr="data-endpoint=${action.actionEndpoint},data-payload=${action.requestPayload}" th:text="${action.iconClass == null ? action.actionLabel : action.iconClass + ' ' + action.actionLabel}">Action</button></div>
+                        <div class="actions" th:each="action : ${panel.value}" th:classappend="${' ' + action.gridSpan}">
+                            <button th:if="${action.componentType == 'ACTION'}" class="action" th:attr="data-endpoint=${action.actionEndpoint},data-payload=${action.requestPayload}" th:text="${action.iconClass == null ? action.actionLabel : action.iconClass + ' ' + action.actionLabel}">Action</button>
+                            <section th:if="${action.componentType == 'TABLE'}" class="sdui-table" th:attr="data-config=${action.componentConfig}"><h4 th:text="${action.actionLabel}">Table</h4><div>Loading...</div></section>
+                            <form th:if="${action.componentType == 'FORM'}" class="sdui-form" th:attr="data-config=${action.componentConfig}"><h4 th:text="${action.actionLabel}">Form</h4></form>
+                            <p th:if="${action.componentType == 'NOTICE'}" class="sdui-notice" th:text="${action.componentConfig}">Notice</p>
+                        </div>
                     </section>
                 </section>
                 <h2>APM Log Explorer</h2><pre id="apm-terminal" class="apm-terminal-window">Waiting for command output...</pre>
@@ -48,6 +53,64 @@
             terminal.textContent += `${terminal.textContent ? '\n' : ''}${value}`;
             terminal.scrollTop = terminal.scrollHeight;
         };
+        const state = {};
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+        const interpolate = (value) => String(value || '').replace(/\{([A-Za-z0-9_]+)\}/g, (_, key) => encodeURIComponent(state[key] ?? ''));
+        const parseConfig = (element) => {
+            try { return JSON.parse(element.dataset.config || '{}'); }
+            catch { throw new Error('Invalid SDUI component configuration'); }
+        };
+        const unwrap = (value) => value && Object.prototype.hasOwnProperty.call(value, 'data') ? value.data : value;
+        const renderTable = async (container) => {
+            const config = parseConfig(container);
+            const target = container.querySelector('div');
+            const response = await fetch(endpointUrl(interpolate(config.endpoint)));
+            if (!response.ok) throw new Error(`Unable to load ${container.querySelector('h4').textContent}`);
+            const rows = unwrap(await response.json()) || [];
+            if (!rows.length) { target.textContent = config.emptyMessage || 'No records found.'; return; }
+            const columns = config.columns || [];
+            const header = columns.map(column => `<th>${escapeHtml(column.label || column.field)}</th>`).join('');
+            const body = rows.map(row => `<tr>${columns.map(column => `<td>${escapeHtml(row[column.field])}</td>`).join('')}</tr>`).join('');
+            target.innerHTML = `<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+        };
+        const renderForm = async (form) => {
+            const config = parseConfig(form);
+            const fields = await Promise.all((config.fields || []).map(async field => {
+                let options = field.options || [];
+                if (field.optionsEndpoint) {
+                    const response = await fetch(endpointUrl(interpolate(field.optionsEndpoint)));
+                    if (!response.ok) throw new Error(`Unable to load ${field.label || field.name}`);
+                    options = unwrap(await response.json()) || [];
+                }
+                const optionMarkup = options.map(option => {
+                    const value = typeof option === 'object' ? option[field.optionValue || 'id'] : option;
+                    const label = typeof option === 'object' ? option[field.optionLabel || 'name'] : option;
+                    return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
+                }).join('');
+                const control = field.type === 'select' ? `<select name="${escapeHtml(field.name)}" ${field.required ? 'required' : ''}>${optionMarkup}</select>` : `<input name="${escapeHtml(field.name)}" type="${escapeHtml(field.type || 'text')}" ${field.required ? 'required' : ''}>`;
+                return `<label>${escapeHtml(field.label || field.name)}${control}</label>`;
+            }));
+            form.innerHTML += fields.join('') + `<button class="action" type="submit">${escapeHtml(config.submitLabel || 'Save')}</button>`;
+            (config.fields || []).filter(field => field.stateKey).forEach(field => {
+                const input = form.elements.namedItem(field.name);
+                state[field.stateKey] = input.value;
+                input.addEventListener('change', () => {
+                    state[field.stateKey] = input.value;
+                    document.querySelectorAll('.sdui-table').forEach(table => renderTable(table).catch(error => table.querySelector('div').textContent = error.message));
+                });
+            });
+            form.addEventListener('submit', async (event) => {
+                try {
+                    event.preventDefault();
+                    const data = Object.fromEntries(new FormData(form));
+                    const response = await fetch(endpointUrl(interpolate(config.endpoint)), { method: config.method || 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                    const result = await response.json();
+                    if (!response.ok || result.success === false) throw new Error(result.message || 'Save failed');
+                    toast('success', result.message || 'Saved');
+                    document.querySelectorAll('.sdui-table').forEach(table => renderTable(table).catch(error => table.querySelector('div').textContent = error.message));
+                } catch (error) { toast('error', error.message); }
+            });
+        };
         const streamAction = (url) => {
             terminal.textContent = '';
             const stream = new EventSource(url);
@@ -58,10 +121,10 @@
         };
         document.querySelectorAll('.action').forEach((button) => button.addEventListener('click', async () => {
             try {
-                const url = endpointUrl(button.dataset.endpoint);
+                const url = endpointUrl(interpolate(button.dataset.endpoint));
                 if (url.includes('/stream')) { streamAction(url); return; }
                 terminal.textContent = `Executing ${button.textContent}...`;
-                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: button.dataset.payload || null });
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: interpolate(button.dataset.payload) || null });
                 const result = await response.json();
                 terminal.textContent = result.data || result.message || 'Command completed';
                 toast(result.success ? 'success' : 'error', result.message || 'Action completed');
@@ -70,6 +133,8 @@
                 toast('error', 'Action failed');
             }
         }));
+        document.querySelectorAll('.sdui-table').forEach(table => renderTable(table).catch(error => table.querySelector('div').textContent = error.message));
+        document.querySelectorAll('.sdui-form').forEach(form => renderForm(form).catch(error => form.textContent = error.message));
     </script>
 </body>
 </html>

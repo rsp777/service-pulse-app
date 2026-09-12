@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.pawar.todo.amt.response.RuntimeConfigurationResponse;
 import com.pawar.todo.amt.response.RuntimeConfigurationUpdate;
 import com.pawar.todo.amt.model.ApplicationConfiguration;
-import com.pawar.todo.amt.respository.ApplicationConfigurationRepository;
 
 @RestController
 @RequestMapping("/api/configuration")
@@ -25,15 +24,15 @@ public class RuntimeConfigurationController {
     private final boolean alertManagementEnabled;
     private final boolean backFillDataPopulationEnabled;
     private final String healthCheckCron;
-    private final ApplicationConfigurationRepository repository;
+    private final com.pawar.todo.amt.respository.ApplicationConfigurationRepository repository;
 
     public RuntimeConfigurationController(
             @Value("${healthcheck.enabled}") boolean healthCheckEnabled,
             @Value("${service-management.enabled}") boolean serviceManagementEnabled,
-            @Value("${alert-management.enabled:true}") boolean alertManagementEnabled,
+            @Value("${alert-management.enabled}") boolean alertManagementEnabled,
             @Value("${backfill-data.populate.enabled:false}") boolean backFillDataPopulationEnabled,
             @Value("${healthcheck.cron}") String healthCheckCron,
-            ApplicationConfigurationRepository repository) {
+            com.pawar.todo.amt.respository.ApplicationConfigurationRepository repository) {
         this.healthCheckEnabled = healthCheckEnabled;
         this.serviceManagementEnabled = serviceManagementEnabled;
         this.alertManagementEnabled = alertManagementEnabled;
@@ -46,15 +45,16 @@ public class RuntimeConfigurationController {
     public RuntimeConfigurationResponse runtime() {
         return new RuntimeConfigurationResponse(value("healthcheck.enabled", healthCheckEnabled),
                 value("service-management.enabled", serviceManagementEnabled),
-            value("alert-management.enabled", alertManagementEnabled),
-            value("backfill-data.populate.enabled", backFillDataPopulationEnabled), healthCheckCron);
+                value("alert-management.enabled", alertManagementEnabled),
+                value("backfill-data.populate.enabled", backFillDataPopulationEnabled), healthCheckCron);
     }
 
     @PutMapping("/runtime")
     public RuntimeConfigurationResponse update(@RequestBody RuntimeConfigurationUpdate update) {
-        logger.info("Updating runtime configuration: healthCheckEnabled={}, serviceManagementEnabled={}, alertManagementEnabled={}, backFillDataPopulationEnabled={}",
-            update.healthCheckEnabled(), update.serviceManagementEnabled(), update.alertManagementEnabled(),
-            update.backFillDataPopulationEnabled());
+        logger.info(
+                "Updating runtime configuration: healthCheckEnabled={}, serviceManagementEnabled={}, alertManagementEnabled={}, backFillDataPopulationEnabled={}",
+                update.healthCheckEnabled(), update.serviceManagementEnabled(), update.alertManagementEnabled(),
+                update.backFillDataPopulationEnabled());
         if (update.healthCheckEnabled() != null) {
             save("healthcheck.enabled", update.healthCheckEnabled().toString());
         }

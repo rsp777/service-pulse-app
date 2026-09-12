@@ -31,6 +31,7 @@ class UniversalScreenControllerTest {
     void mapsContextToTheUniversalDashboardModel() {
         Map<String, Map<String, List<UiAction>>> actions = Map.of("Infrastructure", Map.of("Docker", List.of(new UiAction())));
         when(uiActionService.getGroupedActions("operations")).thenReturn(actions);
+        when(uiActionService.getViewContexts()).thenReturn(List.of("alerts", "dashboard", "settings"));
         when(request.getContextPath()).thenReturn("/service-pulse-app");
         ExtendedModelMap model = new ExtendedModelMap();
 
@@ -39,6 +40,7 @@ class UniversalScreenControllerTest {
         assertEquals("generic-screen", view);
         assertEquals("operations", model.get("viewContext"));
         assertEquals("/service-pulse-app", model.get("contextPath"));
+        assertEquals(List.of("alerts", "dashboard", "settings"), model.get("dashboardContexts"));
         assertEquals(actions, model.get("dashboardActions"));
     }
 }

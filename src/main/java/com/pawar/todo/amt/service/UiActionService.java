@@ -44,6 +44,11 @@ public class UiActionService {
         return groupedActions;
     }
 
+    @Transactional(readOnly = true)
+    public List<String> getViewContexts() {
+        return repository.findDistinctViewContexts().stream().sorted().toList();
+    }
+
     public String md5(List<UiAction> actions) {
         try {
             MessageDigest digest = MessageDigest.getInstance("MD5");
@@ -51,7 +56,9 @@ public class UiActionService {
                 String value = String.join("|", String.valueOf(action.getId()), action.getViewContext(),
                         action.getActionLabel(), action.getActionEndpoint(), valueOrDefault(action.getSidebarCategory(), ""),
                         valueOrDefault(action.getPanelTitle(), ""), valueOrDefault(action.getGridSpan(), "span-12"),
-                        valueOrDefault(action.getIconClass(), ""), action.getRequestPayload() == null ? "" : action.getRequestPayload().toString());
+                    valueOrDefault(action.getIconClass(), ""), valueOrDefault(action.getComponentType(), "ACTION"),
+                    action.getComponentConfig() == null ? "" : action.getComponentConfig(),
+                    action.getRequestPayload() == null ? "" : action.getRequestPayload());
                 digest.update(value.getBytes(StandardCharsets.UTF_8));
             }
             return toHex(digest.digest());

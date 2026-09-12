@@ -18,10 +18,16 @@ public class UniversalScreenController {
         this.uiActionService = uiActionService;
     }
 
+    @GetMapping("/dashboard")
+    public String defaultDashboard() {
+        return "redirect:/dashboard/dashboard";
+    }
+
     @GetMapping("/dashboard/{viewContext}")
     public String renderDashboard(@PathVariable String viewContext, Model model, HttpServletRequest request) {
         model.addAttribute("viewContext", viewContext);
         model.addAttribute("contextPath", request.getContextPath());
+        model.addAttribute("dashboardContexts", uiActionService.getViewContexts());
         model.addAttribute("dashboardActions", uiActionService.getGroupedActions(viewContext));
         return "generic-screen";
     }
