@@ -1,0 +1,47 @@
+-- V8: SDUI CRUD API enablement
+-- The REST API at /api/sdui/actions provides full CRUD capability for screen definitions.
+-- No schema changes are required; this migration documents the feature and is primarily
+-- for tracking the deployment milestone.
+--
+-- Screens/menus can now be dynamically added via:
+--   POST /api/sdui/actions
+-- with a JSON body containing viewContext, actionLabel, actionEndpoint, componentType, and componentConfig
+-- (which holds field definitions, dropdown options, and config flags).
+--
+-- Example: adding a new "analytics" menu with a dropdown and checkbox via REST:
+--   POST /api/sdui/actions
+--   {
+--     "viewContext": "analytics",
+--     "actionLabel": "Export Data",
+--     "actionEndpoint": "/api/analytics/export",
+--     "componentType": "FORM",
+--     "componentConfig": {
+--       "endpoint": "/api/analytics/export",
+--       "method": "POST",
+--       "submitLabel": "Export",
+--       "fields": [
+--         {
+--           "name": "format",
+--           "label": "Export Format",
+--           "type": "select",
+--           "required": true,
+--           "options": ["CSV", "JSON", "Excel"],
+--           "includeBlankOption": true,
+--           "blankLabel": "Select format..."
+--         },
+--         {
+--           "name": "includeArchived",
+--           "label": "Include archived records",
+--           "type": "checkbox"
+--         }
+--       ]
+--     },
+--     "sidebarCategory": "Reporting",
+--     "panelTitle": "Export",
+--     "gridSpan": "span-6"
+--   }
+--
+-- Changes are applied immediately (cache is refreshed on every CRUD operation).
+-- See SduiAdminController and UiActionController for the full API contract.
+
+-- No schema alterations needed; ui_actions table supports arbitrary JSON configurations.

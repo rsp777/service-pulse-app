@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SDUI Admin | Service Pulse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root { --ink: #17212b; --muted: #64717d; --line: #dce3e8; --paper: #f5f7f8; --card: #fff; --accent: #0e7490; --accent-dark: #075985; --ok: #18794e; --bad: #b42318; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 "DM Sans", sans-serif; }
+        a { color: inherit; text-decoration: none; }
+        .app { display: flex; min-height: 100vh; }
+        .sidebar { width: 245px; flex: none; background: #12343b; color: #fff; padding: 24px 0; }
+        .brand { padding: 0 22px 25px; border-bottom: 1px solid #ffffff26; }
+        .brand h1 { margin: 0; font-size: 20px; } .brand p { margin: 4px 0 0; color: #b8d4d8; font-size: 12px; }
+        .nav { margin: 20px 0 0; padding: 0; list-style: none; }
+        .nav a { display: block; padding: 13px 22px; border-left: 3px solid transparent; color: #c7d9dc; font-weight: 600; text-transform: capitalize; }
+        .nav a:hover, .nav a[aria-current="page"] { border-left-color: #55c2cf; background: #ffffff12; color: #fff; }
+        .main { flex: 1; min-width: 0; padding: 30px; }
+        .header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 22px; }
+        .header h2 { margin: 0; font-size: 26px; }
+        .header p { margin: 4px 0 0; color: var(--muted); }
+        .panel { margin-bottom: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: 0 2px 8px #17313d0d; }
+        .panel > h2 { margin: 0 0 16px; font-size: 18px; }
+        .action { min-height: 38px; border: 0; border-radius: 5px; padding: 9px 13px; background: var(--accent); color: #fff; cursor: pointer; font: 600 14px/1.4 "DM Sans", sans-serif; }
+        .action:hover { background: var(--accent-dark); } .action:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #55c2cf; outline-offset: 2px; }
+        .sdui-form { padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: 0 2px 8px #17313d0d; margin-bottom: 16px; }
+        .sdui-form h3 { margin: 0 0 18px; font-size: 18px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .form-grid.full { grid-template-columns: 1fr; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 6px; color: var(--muted); font-size: 13px; font-weight: 600; }
+        input[type="text"], input[type="email"], select, textarea { width: 100%; border: 1px solid #c8d2d8; border-radius: 5px; padding: 9px 10px; background: #fff; color: var(--ink); font: inherit; }
+        textarea { min-height: 100px; resize: vertical; font-family: "Monaco", "Courier New", monospace; font-size: 13px; }
+        .sdui-table { padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: 0 2px 8px #17313d0d; margin-bottom: 16px; }
+        .sdui-table h3 { margin: 0 0 16px; font-size: 18px; }
+        .sdui-table > div { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { padding: 9px 10px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+        td { padding: 11px 10px; border-bottom: 1px solid var(--line); }
+        tbody tr:last-child td { border-bottom: 0; }
+        .row-actions { white-space: nowrap; text-align: right; }
+        .row-action { margin-left: 6px; border: 0; border-radius: 4px; padding: 6px 10px; background: #e8eef0; color: var(--ink); cursor: pointer; font: 600 12px/1 "DM Sans", sans-serif; }
+        .row-action.danger { background: var(--bad); color: #fff; }
+        .row-action:hover { filter: brightness(0.95); }
+        .button-group { display: flex; gap: 8px; margin-top: 18px; }
+        .button-group .action { margin: 0; }
+        .button-group button { flex: 1; }
+        .empty-message { padding: 30px; text-align: center; color: var(--muted); }
+        @media (max-width: 800px) { .app { display: block; } .sidebar { width: auto; padding: 14px; } .brand { padding: 0 8px 12px; } .nav { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; } .nav li { flex: 1 1 auto; } .nav a { border: 0; padding: 9px; text-align: center; } .main { padding: 18px; } .header { align-items: flex-start; flex-direction: column; } .form-grid { grid-template-columns: 1fr; } .button-group { flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="brand"><h1>Service Pulse</h1><p>SDUI Admin</p></div>
+            <nav><ul class="nav" id="navList">
+                <li><a href="sdui-admin" aria-current="page">⚙️ SDUI Admin</a></li>
+            </ul></nav>
+            <nav style="margin-top: 16px; border-top: 1px solid #ffffff26; padding-top: 16px;"><ul class="nav"><li style="padding: 0 22px; color: #b8d4d8; font-size: 12px; font-weight: 700; text-transform: uppercase;">Dashboards</li><li id="dashboardNav"></li></ul></nav>
+        </aside>
+        <main class="main">
+            <header class="header"><div><h2>SDUI Configuration</h2><p>Manage dashboard screens, menus, and fields</p></div><div id="contextInfo" style="text-align: right;"></div></header>
+            <section class="content">
+                <!-- Add/Edit Form -->
+                <div class="sdui-form">
+                    <h3 id="formTitle">Add New UI Action</h3>
+                    <form id="actionForm">
+                        <input type="hidden" id="actionId" name="id">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="viewContext">View Context *</label>
+                                <input type="text" id="viewContext" name="viewContext" required placeholder="e.g., dashboard, alerts, settings">
+                            </div>
+                            <div class="form-group">
+                                <label for="actionLabel">Action Label *</label>
+                                <input type="text" id="actionLabel" name="actionLabel" required placeholder="e.g., View Servers, Export Data">
+                            </div>
+                            <div class="form-group">
+                                <label for="actionEndpoint">Action Endpoint *</label>
+                                <input type="text" id="actionEndpoint" name="actionEndpoint" required placeholder="e.g., /api/servers, /stream/logs">
+                            </div>
+                            <div class="form-group">
+                                <label for="componentType">Component Type *</label>
+                                <select id="componentType" name="componentType" required>
+                                    <option value="">Select type...</option>
+                                    <option value="ACTION">Action (Button)</option>
+                                    <option value="FORM">Form</option>
+                                    <option value="TABLE">Table</option>
+                                    <option value="NOTICE">Notice (Text)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="sidebarCategory">Sidebar Category</label>
+                                <input type="text" id="sidebarCategory" name="sidebarCategory" placeholder="e.g., Administration, Reporting">
+                            </div>
+                            <div class="form-group">
+                                <label for="panelTitle">Panel Title</label>
+                                <input type="text" id="panelTitle" name="panelTitle" placeholder="e.g., Server Management">
+                            </div>
+                            <div class="form-group">
+                                <label for="gridSpan">Grid Span</label>
+                                <select id="gridSpan" name="gridSpan">
+                                    <option value="span-4">1/3 Width (span-4)</option>
+                                    <option value="span-6">1/2 Width (span-6)</option>
+                                    <option value="span-12" selected>Full Width (span-12)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="iconClass">Icon Class</label>
+                                <input type="text" id="iconClass" name="iconClass" placeholder="e.g., ⚙️, 📊">
+                            </div>
+                        </div>
+                        <div class="form-grid full">
+                            <div class="form-group">
+                                <label for="componentConfig">Component Config (JSON)</label>
+                                <textarea id="componentConfig" name="componentConfig" placeholder='{"fields": [{"name": "format", "label": "Format", "type": "select", "options": ["CSV", "JSON"]}]}'></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="requestPayload">Request Payload (JSON)</label>
+                                <textarea id="requestPayload" name="requestPayload" placeholder='{"key": "value"}'></textarea>
+                            </div>
+                        </div>
+                        <div class="button-group">
+                            <button type="submit" class="action">Save Action</button>
+                            <button type="button" id="resetBtn" class="action" style="background: var(--muted);">Reset Form</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Actions Table -->
+                <div class="sdui-table">
+                    <h3>Existing UI Actions</h3>
+                    <div id="tableContainer">Loading...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const contextPath = /*[[${#request.contextPath}]]*/ '';
+        const formTitle = document.getElementById('formTitle');
+        const actionForm = document.getElementById('actionForm');
+        const actionId = document.getElementById('actionId');
+        const resetBtn = document.getElementById('resetBtn');
+        const tableContainer = document.getElementById('tableContainer');
+        const navList = document.getElementById('navList');
+        const dashboardNav = document.getElementById('dashboardNav');
+        const contextInfo = document.getElementById('contextInfo');
+        
+        // Parse URL parameters
+        const getQueryParams = () => {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                returnTo: params.get('returnTo')
+            };
+        };
+        
+        const params = getQueryParams();
+        
+        // Display return button if context is available
+        if (params.returnTo) {
+            const dashboardName = params.returnTo.split('/').pop() || 'Dashboard';
+            const backLink = document.createElement('a');
+            backLink.href = contextPath + params.returnTo;
+            backLink.style.cssText = 'color: #55c2cf; font-weight: 600; text-decoration: underline; cursor: pointer;';
+            backLink.textContent = `← Back to ${dashboardName}`;
+            contextInfo.appendChild(backLink);
+        }
+        
+        const toast = (icon, title, message = '') => Swal.fire({ toast: true, position: 'top-end', icon, title, text: message, showConfirmButton: false, timer: 3500 });
+        
+        const resetForm = () => {
+            actionForm.reset();
+            actionId.value = '';
+            formTitle.textContent = 'Add New UI Action';
+        };
+
+        const loadDashboardContexts = async () => {
+            try {
+                const response = await fetch('/api/sdui/actions');
+                if (!response.ok) return;
+                const actions = await response.json();
+                const contexts = [...new Set(actions.map(a => a.viewContext).filter(Boolean))].sort();
+                
+                const navHtml = contexts.map(context => 
+                    `<li><a href="/dashboard/${encodeURIComponent(context)}" style="border-left: 3px solid transparent; text-transform: capitalize;">${escapeHtml(context)}</a></li>`
+                ).join('');
+                dashboardNav.innerHTML = navHtml;
+            } catch (error) {
+                console.error('Failed to load contexts:', error);
+            }
+        };
+
+        const loadActions = async () => {
+            try {
+                const response = await fetch('/api/sdui/actions');
+                if (!response.ok) throw new Error('Failed to load actions');
+                const actions = await response.json();
+                renderTable(actions);
+                await loadDashboardContexts();
+            } catch (error) {
+                tableContainer.innerHTML = `<div class="empty-message">Error loading actions: ${error.message}</div>`;
+            }
+        };
+
+        const renderTable = (actions) => {
+            if (!actions.length) {
+                tableContainer.innerHTML = '<div class="empty-message">No UI actions configured yet. Create one using the form above.</div>';
+                return;
+            }
+
+            const header = '<tr><th>View Context</th><th>Label</th><th>Endpoint</th><th>Type</th><th>Category</th><th>Actions</th></tr>';
+            const rows = actions.map(action => `
+                <tr>
+                    <td>${escapeHtml(action.viewContext || '')}</td>
+                    <td>${escapeHtml(action.actionLabel || '')}</td>
+                    <td><code style="font-size: 12px; background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">${escapeHtml(action.actionEndpoint || '')}</code></td>
+                    <td>${escapeHtml(action.componentType || '')}</td>
+                    <td>${escapeHtml(action.sidebarCategory || '—')}</td>
+                    <td class="row-actions">
+                        <button type="button" class="row-action" data-action-id="${action.id}">Edit</button>
+                        <button type="button" class="row-action danger" data-action-id="${action.id}" data-delete="true">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            tableContainer.innerHTML = `<div><table><thead>${header}</thead><tbody>${rows}</tbody></table></div>`;
+
+            tableContainer.querySelectorAll('.row-action').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = parseInt(btn.dataset.actionId);
+                    if (btn.dataset.delete) {
+                        deleteAction(id);
+                    } else {
+                        editAction(id, actions);
+                    }
+                });
+            });
+        };
+
+        const editAction = (id, actions) => {
+            const action = actions.find(a => a.id === id);
+            if (!action) return;
+            
+            actionId.value = action.id || '';
+            document.getElementById('viewContext').value = action.viewContext || '';
+            document.getElementById('actionLabel').value = action.actionLabel || '';
+            document.getElementById('actionEndpoint').value = action.actionEndpoint || '';
+            document.getElementById('componentType').value = action.componentType || '';
+            document.getElementById('sidebarCategory').value = action.sidebarCategory || '';
+            document.getElementById('panelTitle').value = action.panelTitle || '';
+            document.getElementById('gridSpan').value = action.gridSpan || 'span-12';
+            document.getElementById('iconClass').value = action.iconClass || '';
+            document.getElementById('componentConfig').value = action.componentConfig ? JSON.stringify(action.componentConfig, null, 2) : '';
+            document.getElementById('requestPayload').value = action.requestPayload ? JSON.stringify(action.requestPayload, null, 2) : '';
+            
+            formTitle.textContent = `Edit: ${action.actionLabel}`;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const deleteAction = async (id) => {
+            const result = await Swal.fire({
+                title: 'Delete Action?',
+                text: 'This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Delete',
+                confirmButtonColor: 'var(--bad)'
+            });
+            
+            if (!result.isConfirmed) return;
+            
+            try {
+                const response = await fetch(`/api/sdui/actions/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Delete failed');
+                toast('success', 'Action deleted');
+                await loadActions();
+            } catch (error) {
+                toast('error', 'Delete failed', error.message);
+            }
+        };
+
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+
+        actionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                const formData = new FormData(actionForm);
+                const id = formData.get('id');
+                
+                // Parse JSON fields
+                let componentConfig = null;
+                let requestPayload = null;
+                
+                try {
+                    const configStr = formData.get('componentConfig')?.trim();
+                    componentConfig = configStr ? JSON.parse(configStr) : null;
+                } catch {
+                    throw new Error('Invalid Component Config JSON');
+                }
+                
+                try {
+                    const payloadStr = formData.get('requestPayload')?.trim();
+                    requestPayload = payloadStr ? JSON.parse(payloadStr) : null;
+                } catch {
+                    throw new Error('Invalid Request Payload JSON');
+                }
+
+                const payload = {
+                    viewContext: formData.get('viewContext'),
+                    actionLabel: formData.get('actionLabel'),
+                    actionEndpoint: formData.get('actionEndpoint'),
+                    componentType: formData.get('componentType'),
+                    componentConfig,
+                    requestPayload,
+                    sidebarCategory: formData.get('sidebarCategory') || null,
+                    panelTitle: formData.get('panelTitle') || null,
+                    gridSpan: formData.get('gridSpan') || 'span-12',
+                    iconClass: formData.get('iconClass') || null
+                };
+
+                const method = id ? 'PUT' : 'POST';
+                const url = id ? `/api/sdui/actions/${id}` : '/api/sdui/actions';
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.message || `HTTP ${response.status}`);
+                }
+
+                toast('success', id ? 'Action updated' : 'Action created');
+                resetForm();
+                await loadActions();
+            } catch (error) {
+                toast('error', 'Save failed', error.message);
+            }
+        });
+
+        resetBtn.addEventListener('click', resetForm);
+
+        // Initial load
+        loadActions();
+    </script>
+</body>
+</html>

@@ -368,6 +368,7 @@
           ><button data-page="servers">Servers</button
           ><button data-page="commands">Commands</button
           ><button data-page="alerts" id="alerts-nav">Alerts</button
+          ><button data-page="sdui-admin">SDUI Admin</button
           ><button data-page="settings">Settings</button>
         </nav>
       </aside>
@@ -450,6 +451,10 @@
           <div class="header"><h2>Alert Management</h2><button class="btn" id="add-alert">+ Add alert</button></div>
           <div class="card"><div class="toolbar"><h2>Alert rules</h2><button class="btn secondary" id="refresh-alerts">Refresh</button></div><div id="alert-table">Loading alerts...</div></div>
           <div class="card"><h2>Recent triggered alerts</h2><div id="alert-events">Loading alert history...</div></div>
+        </section>
+        <section id="sdui-admin" class="page">
+          <div class="header"><h2>Screen Definitions</h2><button class="btn" id="add-sdui-action">+ Add screen</button></div>
+          <div class="card"><div class="toolbar"><h2>Configured screens</h2><button class="btn secondary" id="refresh-sdui-actions">Refresh</button></div><div id="sdui-actions-table">Loading screens...</div></div>
         </section>
         <section id="settings" class="page">
           <div class="header"><h2>Settings</h2></div>
@@ -632,6 +637,7 @@
     <div class="modal" id="path-modal"><div class="modal-content"><div class="modal-header"><h3>Path</h3><button class="close" data-close="path-modal">&times;</button></div><form id="path-crud-form"><input type="hidden" id="path-id"><label for="path-name">Name</label><input id="path-name" required placeholder="LOGS_HOME"><label for="path-description">Filesystem path</label><input id="path-description" required placeholder="/opt/apps/logs"><label for="path-server">Server</label><select id="path-server" required></select><div class="modal-footer"><button type="button" class="btn secondary" data-close="path-modal">Cancel</button><button class="btn" type="submit">Save path</button></div></form></div></div>
     <div class="modal" id="script-modal"><div class="modal-content"><div class="modal-header"><h3>Script</h3><button class="close" data-close="script-modal">&times;</button></div><form id="script-crud-form"><input type="hidden" id="script-id"><label for="script-name">Name</label><input id="script-name" required placeholder="start"><label for="script-extension">Extension</label><select id="script-extension"><option value="SH">SH</option><option value="BASH">BASH</option><option value="BAT">BAT</option></select><div class="modal-footer"><button type="button" class="btn secondary" data-close="script-modal">Cancel</button><button class="btn" type="submit">Save script</button></div></form></div></div>
     <div class="modal" id="alert-modal"><div class="modal-content"><div class="modal-header"><h3>Alert rule</h3><button class="close" data-close="alert-modal">&times;</button></div><form id="alert-form"><input type="hidden" id="alert-id"><label for="alert-name">Name</label><input id="alert-name" required placeholder="Payments down"><label for="alert-target-type">Target</label><select id="alert-target-type"><option value="SERVER">Server</option><option value="SERVICE">Service</option></select><label for="alert-server">Server</label><select id="alert-server"></select><label for="alert-service">Service</label><select id="alert-service"></select><label for="alert-condition-type">Condition</label><select id="alert-condition-type"><option value="STATUS">Health status</option><option value="RESPONSE_TIME">Response time</option></select><label for="alert-operator">Operator</label><select id="alert-operator"><option value="EQUALS">Equals</option><option value="NOT_EQUALS">Not equals</option></select><label for="alert-condition-value">Expected value</label><input id="alert-condition-value" required placeholder="DOWN"><label><input id="alert-enabled" type="checkbox" checked> Alert enabled</label><div class="modal-footer"><button type="button" class="btn secondary" data-close="alert-modal">Cancel</button><button class="btn" type="submit">Save alert</button></div></form></div></div>
+    <div class="modal" id="sdui-action-modal"><div class="modal-content" style="max-height: 95vh; overflow-y: auto;"><div class="modal-header"><h3>Screen Definition</h3><button class="close" data-close="sdui-action-modal">&times;</button></div><form id="sdui-action-form"><input type="hidden" id="sdui-action-id"><label for="sdui-view-context">View Context *</label><input id="sdui-view-context" required placeholder="e.g., dashboard, analytics"><label for="sdui-action-label">Action Label *</label><input id="sdui-action-label" required placeholder="e.g., Export Data"><label for="sdui-action-endpoint">Action Endpoint *</label><input id="sdui-action-endpoint" required placeholder="e.g., /api/analytics/export"><label for="sdui-component-type">Component Type</label><select id="sdui-component-type"><option value="ACTION">ACTION</option><option value="FORM">FORM</option><option value="MENU">MENU</option><option value="PANEL">PANEL</option></select><label for="sdui-sidebar-category">Sidebar Category</label><input id="sdui-sidebar-category" placeholder="e.g., Reporting"><label for="sdui-panel-title">Panel Title</label><input id="sdui-panel-title" placeholder="e.g., Export"><label for="sdui-grid-span">Grid Span</label><select id="sdui-grid-span"><option value="span-12">span-12 (Full width)</option><option value="span-6">span-6 (Half width)</option><option value="span-4">span-4 (Third width)</option></select><label for="sdui-icon-class">Icon Class</label><input id="sdui-icon-class" placeholder="e.g., icon-export"><label for="sdui-component-config">Component Config (JSON)</label><textarea id="sdui-component-config" placeholder='{\n  "endpoint": "/api/analytics/export",\n  "method": "POST",\n  "fields": [{\n    "name": "format",\n    "type": "select",\n    "options": ["CSV", "JSON"]\n  }]\n}' style="font-family: monospace; font-size: 12px; min-height: 150px;"></textarea><label for="sdui-request-payload">Request Payload (JSON)</label><textarea id="sdui-request-payload" placeholder='{\n  "defaultFormat": "CSV"\n}' style="font-family: monospace; font-size: 12px; min-height: 100px;"></textarea><div class="modal-footer"><button type="button" class="btn secondary" data-close="sdui-action-modal">Cancel</button><button class="btn" type="submit">Save screen</button></div></form></div></div>
     <div class="context" id="context">
       <button data-action="logs">View logs</button
       ><button data-action="start">Start service</button
@@ -695,6 +701,7 @@
           if (page === "servers") renderServerTable();
           if (page === "commands") loadCommands();
           if (page === "alerts") loadAlerts();
+          if (page === "sdui-admin") loadSduiActions();
           if (page === "settings") loadSettings();
         };
         const loadSettings = async () => {
@@ -772,6 +779,107 @@
         const toggleAlertTarget = () => { const server = $("alert-target-type").value === "SERVER"; $("alert-server").disabled = !server; $("alert-service").disabled = server; };
         const deleteAlert = async (id) => { if (!window.confirm("Delete this alert?")) return; try { await request(`api/alerts/${id}`, { method: "DELETE" }); await loadAlerts(); } catch (error) { notice(error.message, true); } };
         const toggleAlert = async (id) => { const alert = state.alerts.find((item) => item.id === id); if (!alert) return; try { await request(`api/alerts/${id}`, { method: "PUT", body: JSON.stringify({...alert, enabled: !alert.enabled}) }); await loadAlerts(); } catch (error) { notice(error.message, true); } };
+        const loadSduiActions = async () => {
+          try {
+            state.sduiActions = unwrap(await request("api/sdui/actions")) || [];
+            renderSduiActions();
+          } catch (error) { 
+            $("sdui-actions-table").textContent = "Unable to load screens."; 
+            notice(error.message, true); 
+          }
+        };
+        const renderSduiActions = () => {
+          const grouped = {};
+          state.sduiActions.forEach((action) => {
+            if (!grouped[action.viewContext]) grouped[action.viewContext] = [];
+            grouped[action.viewContext].push(action);
+          });
+          $("sdui-actions-table").innerHTML = Object.keys(grouped).length ? Object.entries(grouped).map(([context, actions]) => `
+            <div style="margin-bottom: 20px;">
+              <h3 style="margin: 0 0 12px; color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">${escapeHtml(context)}</h3>
+              ${actions.map((action) => `<div class="service"><span><strong>${escapeHtml(action.actionLabel)}</strong><small>${escapeHtml(action.actionEndpoint)} · ${escapeHtml(action.componentType)}</small></span><span class="actions"><button class="btn secondary" data-sdui-edit="${action.id}">Edit</button><button class="btn danger" data-sdui-delete="${action.id}">Delete</button></span></div>`).join("")}
+            </div>
+          `).join("") : "No screen definitions configured.";
+          document.querySelectorAll("[data-sdui-edit]").forEach((button) => button.onclick = () => openSduiAction(Number(button.dataset.sduiEdit)));
+          document.querySelectorAll("[data-sdui-delete]").forEach((button) => button.onclick = () => deleteSduiAction(Number(button.dataset.sduiDelete)));
+        };
+        const openSduiAction = (id = null) => {
+          $("sdui-action-form").reset();
+          $("sdui-action-id").value = id || "";
+          $("sdui-component-type").value = "ACTION";
+          $("sdui-grid-span").value = "span-12";
+          if (id) {
+            const action = state.sduiActions.find((item) => item.id === id);
+            if (!action) return notice("Screen definition not found.", true);
+            $("sdui-view-context").value = action.viewContext || "";
+            $("sdui-action-label").value = action.actionLabel || "";
+            $("sdui-action-endpoint").value = action.actionEndpoint || "";
+            $("sdui-component-type").value = action.componentType || "ACTION";
+            $("sdui-sidebar-category").value = action.sidebarCategory || "";
+            $("sdui-panel-title").value = action.panelTitle || "";
+            $("sdui-grid-span").value = action.gridSpan || "span-12";
+            $("sdui-icon-class").value = action.iconClass || "";
+            $("sdui-component-config").value = typeof action.componentConfig === "string" ? action.componentConfig : JSON.stringify(action.componentConfig || {}, null, 2);
+            $("sdui-request-payload").value = typeof action.requestPayload === "string" ? action.requestPayload : JSON.stringify(action.requestPayload || {}, null, 2);
+          }
+          $("sdui-action-modal").classList.add("active");
+        };
+        const deleteSduiAction = async (id) => {
+          if (!window.confirm("Delete this screen definition?")) return;
+          try {
+            await request(`api/sdui/actions/${id}`, { method: "DELETE" });
+            await loadSduiActions();
+            notice("Screen definition deleted.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
+        $("add-sdui-action").onclick = () => openSduiAction();
+        $("refresh-sdui-actions").onclick = loadSduiActions;
+        $("sdui-action-form").onsubmit = async (event) => {
+          event.preventDefault();
+          const id = $("sdui-action-id").value;
+          try {
+            let componentConfig = {};
+            let requestPayload = {};
+            try {
+              const configText = $("sdui-component-config").value.trim();
+              if (configText) componentConfig = JSON.parse(configText);
+            } catch (e) {
+              return notice("Component Config must be valid JSON.", true);
+            }
+            try {
+              const payloadText = $("sdui-request-payload").value.trim();
+              if (payloadText) requestPayload = JSON.parse(payloadText);
+            } catch (e) {
+              return notice("Request Payload must be valid JSON.", true);
+            }
+            const body = {
+              viewContext: $("sdui-view-context").value.trim(),
+              actionLabel: $("sdui-action-label").value.trim(),
+              actionEndpoint: $("sdui-action-endpoint").value.trim(),
+              componentType: $("sdui-component-type").value,
+              componentConfig: componentConfig,
+              requestPayload: requestPayload,
+              sidebarCategory: $("sdui-sidebar-category").value.trim() || null,
+              panelTitle: $("sdui-panel-title").value.trim() || null,
+              gridSpan: $("sdui-grid-span").value,
+              iconClass: $("sdui-icon-class").value.trim() || null,
+            };
+            if (!body.viewContext || !body.actionLabel || !body.actionEndpoint) {
+              return notice("View Context, Action Label, and Action Endpoint are required.", true);
+            }
+            await request(id ? `api/sdui/actions/${id}` : "api/sdui/actions", {
+              method: id ? "PUT" : "POST",
+              body: JSON.stringify(body),
+            });
+            $("sdui-action-modal").classList.remove("active");
+            await loadSduiActions();
+            notice(id ? "Screen definition updated." : "Screen definition created.");
+          } catch (error) {
+            notice(error.message, true);
+          }
+        };
         const renderPaths = () => {
           $("path-table").innerHTML = state.paths.length
             ? state.paths.map((path) => `<div class="service" data-path-id="${path.id}"><span><strong>${escapeHtml(path.pathName)}</strong><small>${escapeHtml(path.pathDescription || "")}</small></span><span class="actions"><button class="btn secondary" data-path-action="edit">Edit</button><button class="btn danger" data-path-action="delete">Delete</button></span></div>`).join("")
