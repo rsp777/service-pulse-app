@@ -90,7 +90,7 @@
                 const control = field.type === 'select' ? `<select name="${escapeHtml(field.name)}" ${field.required ? 'required' : ''}>${optionMarkup}</select>` : `<input name="${escapeHtml(field.name)}" type="${escapeHtml(field.type || 'text')}" ${field.required ? 'required' : ''}>`;
                 return `<label>${escapeHtml(field.label || field.name)}${control}</label>`;
             }));
-            form.innerHTML += fields.join('') + `<button class="action" type="submit">${escapeHtml(config.submitLabel || 'Save')}</button>`;
+            form.innerHTML += fields.join('') + (config.stateOnly ? '' : `<button class="action" type="submit">${escapeHtml(config.submitLabel || 'Save')}</button>`);
             (config.fields || []).filter(field => field.stateKey).forEach(field => {
                 const input = form.elements.namedItem(field.name);
                 state[field.stateKey] = input.value;
@@ -99,6 +99,7 @@
                     document.querySelectorAll('.sdui-table').forEach(table => renderTable(table).catch(error => table.querySelector('div').textContent = error.message));
                 });
             });
+            if (config.stateOnly) return;
             form.addEventListener('submit', async (event) => {
                 try {
                     event.preventDefault();
@@ -133,8 +134,9 @@
                 toast('error', 'Action failed');
             }
         }));
-        document.querySelectorAll('.sdui-table').forEach(table => renderTable(table).catch(error => table.querySelector('div').textContent = error.message));
-        document.querySelectorAll('.sdui-form').forEach(form => renderForm(form).catch(error => form.textContent = error.message));
+        const forms = Array.from(document.querySelectorAll('.sdui-form'));
+        Promise.all(forms.map(form => renderForm(form).catch(error => form.textContent = error.message)))
+            .then(() => document.querySelectorAll('.sdui-table').forEach(table => renderTable(table).catch(error => table.querySelector('div').textContent = error.message)));
     </script>
 </body>
 </html>

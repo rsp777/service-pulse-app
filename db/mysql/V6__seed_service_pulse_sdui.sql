@@ -8,7 +8,7 @@ WHERE NOT EXISTS (SELECT 1 FROM ui_actions WHERE view_context = 'dashboard' AND 
 
 INSERT INTO ui_actions (view_context, action_label, action_endpoint, component_type, component_config, sidebar_category, panel_title, grid_span)
 SELECT 'dashboard', 'Server Controls', '/api/servers', 'FORM',
-       JSON_OBJECT('fields', JSON_ARRAY(JSON_OBJECT('name', 'serverId', 'label', 'Active server', 'type', 'select', 'optionsEndpoint', '/api/servers', 'optionValue', 'id', 'optionLabel', 'hostname', 'stateKey', 'serverId')), 'submitLabel', 'Refresh server'),
+    JSON_OBJECT('stateOnly', TRUE, 'fields', JSON_ARRAY(JSON_OBJECT('name', 'serverId', 'label', 'Active server', 'type', 'select', 'optionsEndpoint', '/api/servers', 'optionValue', 'id', 'optionLabel', 'hostname', 'stateKey', 'serverId'))),
        'Infrastructure', 'Servers', 'span-6'
 WHERE NOT EXISTS (SELECT 1 FROM ui_actions WHERE view_context = 'dashboard' AND action_label = 'Server Controls');
 
