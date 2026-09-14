@@ -59,4 +59,8 @@
     <changeSet id="17-enable-modal-for-all-forms" author="service-pulse" dbms="mysql">
         <sqlFile path="sql/V17__enable_modal_for_all_forms.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
     </changeSet>
+    <changeSet id="18-system-logs-sdui" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V18__system_logs_sdui.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
 </databaseChangeLog>
+

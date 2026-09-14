@@ -199,6 +199,22 @@
             color: #94a3b8;
             font-style: italic;
         }
+        /* ===== System Log Viewer ===== */
+        .sdui-logs { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+        .sdui-logs h4 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+        .logs-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .logs-controls select { width: auto; margin: 0; padding: 6px 10px; font-size: 13px; border-radius: 6px; }
+        .logs-controls button { padding: 6px 14px; border: 0; border-radius: 6px; font: 600 13px "DM Sans",sans-serif; cursor: pointer; transition: all 0.2s; }
+        .logs-btn-live   { background: var(--ok); color: #fff; }
+        .logs-btn-live.active { background: #dc2626; }
+        .logs-btn-clear  { background: #f3f4f6; color: var(--ink); }
+        .logs-btn-refresh { background: var(--accent); color: #fff; }
+        .logs-output { min-height: 200px; max-height: 420px; margin: 0; overflow: auto; border-radius: 8px; background: #0f172a; color: #e2e8f0; padding: 14px 16px; white-space: pre-wrap; word-break: break-word; font-family: "Monaco","Courier New",monospace; font-size: 12px; line-height: 1.6; }
+        .log-level-error { color: #f87171; }
+        .log-level-warn  { color: #fbbf24; }
+        .log-level-info  { color: #e2e8f0; }
+        .log-level-debug { color: #94a3b8; }
+        .log-level-trace { color: #64748b; }
     </style>
 </head>
 <body th:attr="data-context-path=${contextPath}">
@@ -226,6 +242,11 @@
                                 <section th:if="${action.componentType == 'TABLE'}" class="sdui-table" th:attr="data-config=${action.componentConfig}"><h4 th:text="${action.actionLabel}">Table</h4><div>Loading...</div></section>
                                 <form th:if="${action.componentType == 'FORM'}" class="sdui-form" th:attr="data-config=${action.componentConfig}"><h4 th:text="${action.actionLabel}">Form</h4></form>
                                 <p th:if="${action.componentType == 'NOTICE'}" class="sdui-notice" th:text="${action.componentConfig}">Notice</p>
+                                <section th:if="${action.componentType == 'LOGS'}" class="sdui-logs" th:attr="data-config=${action.componentConfig}">
+                                    <h4 th:text="${action.actionLabel}">System Logs</h4>
+                                    <div class="logs-controls"></div>
+                                    <pre class="logs-output">Loading logs...</pre>
+                                </section>
                             </div>
                         </div>
                     </section>
@@ -630,9 +651,112 @@
                 toast('error', 'Action failed');
             }
         }));
+        // ── System Logs component ──────────────────────────────────────────
+        const levelClass = (level) => {
+            const l = (level || '').toUpperCase();
+            if (l === 'ERROR') return 'log-level-error';
+            if (l === 'WARN')  return 'log-level-warn';
+            if (l === 'INFO')  return 'log-level-info';
+            if (l === 'DEBUG') return 'log-level-debug';
+            return 'log-level-trace';
+        };
+        const formatLogEntry = (entry) => {
+            const ts  = entry.timestamp || '';
+            const lvl = (entry.level   || 'INFO').padEnd(5);
+            const lgr = entry.logger   || '';
+            const msg = entry.message  || '';
+            return `<span class="${levelClass(entry.level)}">${escapeHtml(ts)} [${escapeHtml(lvl)}] ${escapeHtml(lgr)} - ${escapeHtml(msg)}</span>`;
+        };
+        const renderLogs = async (container) => {
+            const config = parseConfig(container);
+            const output = container.querySelector('.logs-output');
+            const controls = container.querySelector('.logs-controls');
+            // Build controls if not already built
+            if (!container._logsReady) {
+                container._logsReady = true;
+                const levelSel = document.createElement('select');
+                levelSel.id = 'logs-level-filter';
+                ['ALL','DEBUG','INFO','WARN','ERROR'].forEach(l => {
+                    const opt = document.createElement('option');
+                    opt.value = l; opt.textContent = l;
+                    if (l === 'INFO') opt.selected = true;
+                    levelSel.appendChild(opt);
+                });
+                const refreshBtn = document.createElement('button');
+                refreshBtn.className = 'logs-btn-refresh';
+                refreshBtn.textContent = '↻ Refresh';
+                const liveBtn = document.createElement('button');
+                liveBtn.className = 'logs-btn-live';
+                liveBtn.textContent = '● Live';
+                const clearBtn = document.createElement('button');
+                clearBtn.className = 'logs-btn-clear';
+                clearBtn.textContent = 'Clear';
+                controls.append(levelSel, refreshBtn, liveBtn, clearBtn);
+                container._logLevel = () => levelSel.value === 'ALL' ? 'TRACE' : levelSel.value;
+                // Refresh button
+                refreshBtn.addEventListener('click', () => loadLogs(container));
+                levelSel.addEventListener('change', () => loadLogs(container));
+                // Live toggle
+                container._liveStream = null;
+                liveBtn.addEventListener('click', () => {
+                    if (container._liveStream) {
+                        container._liveStream.close();
+                        container._liveStream = null;
+                        liveBtn.textContent = '● Live';
+                        liveBtn.classList.remove('active');
+                    } else {
+                        const url = endpointUrl(config.streamEndpoint || '/api/system/logs/stream');
+                        const sse = new EventSource(url);
+                        container._liveStream = sse;
+                        liveBtn.textContent = '■ Stop';
+                        liveBtn.classList.add('active');
+                        sse.addEventListener('log', event => {
+                            try {
+                                const entry = JSON.parse(event.data);
+                                const line = document.createElement('span');
+                                line.className = levelClass(entry.level);
+                                line.textContent = `${entry.timestamp} [${(entry.level||'').padEnd(5)}] ${entry.logger} - ${entry.message}`;
+                                output.appendChild(line);
+                                output.appendChild(document.createTextNode('\n'));
+                                output.scrollTop = output.scrollHeight;
+                            } catch {}
+                        });
+                        sse.addEventListener('error', () => {
+                            container._liveStream = null;
+                            liveBtn.textContent = '● Live';
+                            liveBtn.classList.remove('active');
+                        });
+                    }
+                });
+                // Clear button (client-side only)
+                clearBtn.addEventListener('click', () => { output.innerHTML = ''; });
+            }
+            loadLogs(container);
+        };
+        const loadLogs = async (container) => {
+            const config = parseConfig(container);
+            const output = container.querySelector('.logs-output');
+            const minLevel = container._logLevel ? container._logLevel() : 'INFO';
+            const lines = config.lines || 200;
+            const endpoint = config.loadEndpoint || config.endpoint || '/api/system/logs';
+            const url = endpointUrl(`${endpoint}?lines=${lines}&minLevel=${minLevel}`);
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to fetch logs');
+                const json = await res.json();
+                const entries = unwrap(json) || [];
+                output.innerHTML = entries.map(formatLogEntry).join('\n');
+                output.scrollTop = output.scrollHeight;
+            } catch (err) {
+                output.textContent = `Error loading logs: ${err.message}`;
+            }
+        };
+
         const forms = Array.from(document.querySelectorAll('.sdui-form'));
         Promise.all(forms.map(form => renderForm(form).catch(error => form.textContent = error.message)))
             .then(() => Promise.all(Array.from(document.querySelectorAll('.sdui-table')).map(table => renderTable(table).catch(error => table.querySelector('div').textContent = error.message))));
+        // Initialize LOGS components
+        Array.from(document.querySelectorAll('.sdui-logs')).forEach(c => renderLogs(c).catch(err => { const o = c.querySelector('.logs-output'); if (o) o.textContent = err.message; }));
     </script>
 </body>
-</html>
+</html>

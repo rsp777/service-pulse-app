@@ -120,7 +120,7 @@ public class AlertConfigurationService {
     }
 
     private boolean matchesTarget(AlertConfiguration alert, Integer serverId, Integer serviceId) {
-        log.info("Target Type : {}, Alert Server ID : {}, Alert Service ID : {}, Server ID : {}, Service ID : {}",
+        log.debug("Target Type : {}, Alert Server ID : {}, Alert Service ID : {}, Server ID : {}, Service ID : {}",
                 alert.getTargetType(), alert.getServerId(), alert.getServiceId(), serverId, serviceId);
         if ("SERVER".equals(alert.getTargetType()))
             return alert.getServerId() != null && alert.getServerId().equals(serverId);
@@ -129,7 +129,7 @@ public class AlertConfigurationService {
     }
 
     private boolean matchesCondition(AlertConfiguration alert, String status, Long responseTime) {
-        log.info("Condition Actual : {}, Condition Type : {}, Condition Operator : {}, Condition Value : {}", status,
+        log.debug("Condition Actual : {}, Condition Type : {}, Condition Operator : {}, Condition Value : {}", status,
                 alert.getConditionType(), alert.getOperator(), alert.getConditionValue());
         String actual = "STATUS".equals(alert.getConditionType()) ? status
                 : responseTime == null ? null : responseTime.toString();

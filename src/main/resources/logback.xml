@@ -5,6 +5,7 @@
     <!-- Suppress Logback internal logging -->
     <logger name="ch.qos.logback" level="WARN" />
 
+    <!-- ── Console appender (INFO+) ──────────────────────────────────── -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>${LOG_PATTERN}</pattern>
@@ -14,6 +15,7 @@
         </filter>
     </appender>
 
+    <!-- ── Rolling file appender (all levels) ────────────────────────── -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/application.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
@@ -25,7 +27,7 @@
         </encoder>
     </appender>
 
-    <!-- New Error File Appender -->
+    <!-- ── Error-only rolling file appender ──────────────────────────── -->
     <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/error.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
@@ -40,11 +42,22 @@
         </filter>
     </appender>
 
-    <logger name="org.springframework" level="WARN" />
-    <logger name="org.hibernate.SQL" level="WARN" />
-    <logger name="org.hibernate.orm.jdbc.bind" level="WARN" />
+    <!-- ── In-memory ring-buffer appender (System Logs UI) ───────────── -->
+    <appender name="MEMORY" class="com.pawar.todo.amt.logging.SystemLogAppender" />
 
-    <logger name="com.pawar.todo.amt" level="INFO" />
+    <!-- ── Suppress SQL / Hibernate query logging ─────────────────────── -->
+    <logger name="org.hibernate.SQL"              level="WARN" />
+    <logger name="org.hibernate.orm.jdbc.bind"    level="WARN" />
+    <logger name="org.hibernate.type"             level="WARN" />
+    <logger name="org.hibernate.engine.jdbc"      level="WARN" />
+    <logger name="com.zaxxer.hikari"              level="WARN" />
+
+    <!-- ── Suppress Spring framework verbosity ───────────────────────── -->
+    <logger name="org.springframework"            level="WARN" />
+
+    <!-- ── Application loggers ───────────────────────────────────────── -->
+    <logger name="com.pawar.todo.amt"             level="INFO" />
+    <logger name="com.pawar.sop"                  level="INFO" />
 
     <logger name="AUDIT_LOGGER" level="INFO" additivity="false">
         <appender-ref ref="FILE" />
@@ -54,5 +67,6 @@
         <appender-ref ref="STDOUT" />
         <appender-ref ref="FILE" />
         <appender-ref ref="ERROR_FILE" />
+        <appender-ref ref="MEMORY" />
     </root>
 </configuration>
