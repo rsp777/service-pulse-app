@@ -8,7 +8,7 @@ import com.pawar.app.healthcheck.dto.ServerResponseDto;
 import com.pawar.app.healthcheck.dto.CommandResponseDto;
 import com.pawar.app.healthcheck.dto.ServiceResponseDto;
 import com.pawar.todo.amt.constants.ServerStatus;
-import com.pawar.todo.amt.exceptions.AgentOperationException;
+import com.pawar.todo.amt.exceptions.ServerOperationException;
 import com.pawar.todo.amt.exceptions.CommandOperationException;
 import com.pawar.todo.amt.exceptions.PathOperationException;
 import com.pawar.todo.amt.exceptions.ServiceOperationException;
@@ -37,15 +37,15 @@ public class LogsServiceImpl implements LogsService {
 
 	@Override
 	public String viewLogsByService(Integer serverId, Integer serviceId)
-			throws AgentOperationException, IOException, ServiceOperationException, CommandOperationException,
+			throws ServerOperationException, IOException, ServiceOperationException, CommandOperationException,
 			PathOperationException {
 
 		ServerResponseDto server;
 		try {
 			server = serverService.findServerById(serverId)
-					.orElseThrow(() -> new AgentOperationException("Server does not exist"));
+					.orElseThrow(() -> new ServerOperationException("Server does not exist"));
 		} catch (com.pawar.todo.amt.exceptions.ServerOperationException exception) {
-			throw new AgentOperationException("Failed to load server", exception);
+			throw new ServerOperationException("Failed to load server", exception);
 		}
 
 		ServiceResponseDto service = serviceService.findServiceById(serviceId)
@@ -78,7 +78,7 @@ public class LogsServiceImpl implements LogsService {
 	@Override
 	public void streamLogsByService(Integer serverId, Integer serviceId, Consumer<String> lineConsumer,
 			AtomicBoolean stopped)
-			throws AgentOperationException, IOException, ServiceOperationException, CommandOperationException,
+			throws ServerOperationException, IOException, ServiceOperationException, CommandOperationException,
 			PathOperationException {
 		ServerResponseDto server = loadServer(serverId);
 		ServiceResponseDto service = serviceService.findServiceById(serviceId)
@@ -95,12 +95,12 @@ public class LogsServiceImpl implements LogsService {
 				lineConsumer, stopped);
 	}
 
-	private ServerResponseDto loadServer(Integer serverId) throws AgentOperationException {
+	private ServerResponseDto loadServer(Integer serverId) throws ServerOperationException {
 		try {
 			return serverService.findServerById(serverId)
-					.orElseThrow(() -> new AgentOperationException("Server does not exist"));
+					.orElseThrow(() -> new ServerOperationException("Server does not exist"));
 		} catch (com.pawar.todo.amt.exceptions.ServerOperationException exception) {
-			throw new AgentOperationException("Failed to load server", exception);
+			throw new ServerOperationException("Failed to load server", exception);
 		}
 	}
 

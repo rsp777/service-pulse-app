@@ -35,7 +35,7 @@ import com.pawar.todo.amt.constants.HealthCheckStatus;
 import com.pawar.todo.amt.constants.ServerStatus;
 import com.pawar.todo.amt.constants.ScriptExtension;
 import com.pawar.todo.amt.converter.ScriptExtensionConverter;
-import com.pawar.todo.amt.exceptions.AgentOperationException;
+import com.pawar.todo.amt.exceptions.ServerOperationException;
 import com.pawar.todo.amt.exceptions.PathOperationException;
 import com.pawar.todo.amt.exceptions.ResourceNotFoundException;
 import com.pawar.todo.amt.exceptions.ServiceHealthStatusOperationException;
@@ -143,7 +143,7 @@ public class ManageServicesImpl implements ManageServices {
 	}
 
 	@Override
-	public String startService(Integer serverId, Integer serviceId) throws AgentOperationException,
+	public String startService(Integer serverId, Integer serviceId) throws ServerOperationException,
 			ServiceOperationException, IOException, ServiceHealthStatusOperationException, PathOperationException,
 			ResourceNotFoundException {
 		if (!runtimeFlag("service-management.enabled", serviceManagementEnabled)) {
@@ -179,7 +179,7 @@ public class ManageServicesImpl implements ManageServices {
 	}
 
 	@Override
-	public String stopService(Integer serverId, Integer serviceId) throws AgentOperationException,
+	public String stopService(Integer serverId, Integer serviceId) throws ServerOperationException,
 			ServiceOperationException, IOException, ResourceNotFoundException, ServiceHealthStatusOperationException,
 			PathOperationException {
 
@@ -242,18 +242,18 @@ public class ManageServicesImpl implements ManageServices {
 		serviceHealthStatusService.updateServiceHealthStatus(serviceHealthStatus.id(), serviceHealthStatusRequestDto);
 	}
 
-	private ServerResponseDto getServer(Integer serverId) throws AgentOperationException {
+	private ServerResponseDto getServer(Integer serverId) throws ServerOperationException {
 		try {
 			return serverService.findServerById(serverId)
-					.orElseThrow(() -> new AgentOperationException("Server does not exist"));
+					.orElseThrow(() -> new ServerOperationException("Server does not exist"));
 		} catch (com.pawar.todo.amt.exceptions.ServerOperationException exception) {
-			throw new AgentOperationException("Failed to load server", exception);
+			throw new ServerOperationException("Failed to load server", exception);
 		}
 	}
 
 	@Override
 	public String startAllServices(Integer serverId)
-			throws AgentOperationException, IOException, PathOperationException,
+			throws ServerOperationException, IOException, PathOperationException,
 			ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
 		ServerResponseDto server = getServer(serverId);
 
@@ -272,7 +272,8 @@ public class ManageServicesImpl implements ManageServices {
 	}
 
 	@Override
-	public String stopAllServices(Integer serverId) throws AgentOperationException, IOException, PathOperationException,
+	public String stopAllServices(Integer serverId)
+			throws ServerOperationException, IOException, PathOperationException,
 			ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
 		if (!runtimeFlag("service-management.enabled", serviceManagementEnabled)) {
 			return "Service management is disabled";
@@ -296,7 +297,7 @@ public class ManageServicesImpl implements ManageServices {
 
 	@Override
 	public String restartAllServices(Integer serverId)
-			throws AgentOperationException, IOException, PathOperationException,
+			throws ServerOperationException, IOException, PathOperationException,
 			ResourceNotFoundException, ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
 		stopAllServices(serverId);
 		return startAllServices(serverId);
@@ -304,7 +305,7 @@ public class ManageServicesImpl implements ManageServices {
 
 	@Override
 	public void streamAllServices(Integer serverId, String action, Consumer<String> lineConsumer, AtomicBoolean stopped)
-			throws AgentOperationException, IOException, PathOperationException, ResourceNotFoundException,
+			throws ServerOperationException, IOException, PathOperationException, ResourceNotFoundException,
 			ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
 		if (!runtimeFlag("service-management.enabled", serviceManagementEnabled)) {
 			lineConsumer.accept("Service management is disabled");
@@ -330,7 +331,7 @@ public class ManageServicesImpl implements ManageServices {
 
 	private void streamBulkCommand(ServerResponseDto server, String scriptName, Consumer<String> lineConsumer,
 			AtomicBoolean stopped)
-			throws IOException, PathOperationException, ResourceNotFoundException, AgentOperationException,
+			throws IOException, PathOperationException, ResourceNotFoundException, ServerOperationException,
 			ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
 		String status = scriptName.startsWith("start") ? "UP" : "DOWN";
 		String command = startStopCommand(null, "SCRIPTS_HOME", scriptName);
@@ -364,7 +365,7 @@ public class ManageServicesImpl implements ManageServices {
 
 	// Method to update health status for all services
 	private void updateAllServiceHealthStatus(Integer serverId, String status, String lastUpdatedSource)
-			throws AgentOperationException, ServiceHealthStatusOperationException, InterruptedException,
+			throws ServerOperationException, ServiceHealthStatusOperationException, InterruptedException,
 			ExecutionException {
 		ServerResponseDto server = getServer(serverId);
 		for (ServiceResponseDto service : Optional.ofNullable(server.services()).orElse(Set.of())) {
@@ -417,19 +418,38 @@ public class ManageServicesImpl implements ManageServices {
 							.orElseGet(ServiceHealthStatus::new);
 					healthStatus.setService(existingService);
 					healthStatus.setServer(server);
+					boolean hadActiveAlert = alertConfigurationService.hasActiveAlert(server.getId(),
+							existingService.getId());
 					long healthCheckStarted = System.nanoTime();
 					boolean serviceUp = isServiceRunning(configuredHealthCheckUrl.get());
 					healthStatus.setResponseTime((System.nanoTime() - healthCheckStarted) / 1_000_000);
-					log.info("Health check completed: serverId={}, serviceId={}, status={}", server.getId(),
-							existingService.getId(), serviceUp ? HealthCheckStatus.UP : HealthCheckStatus.DOWN);
+
+					if (serviceUp) {
+						if (hadActiveAlert) {
+							log.info("Service recovered: serverId={}, serviceId={} is now UP (closing alert)",
+									server.getId(), existingService.getId());
+						} else {
+							log.info("Health check completed: serverId={}, serviceId={}, status=UP",
+									server.getId(), existingService.getId());
+						}
+					} else {
+						if (!hadActiveAlert) {
+							log.warn("Health check failed: serverId={}, serviceId={}, status=DOWN (triggering alert)",
+									server.getId(), existingService.getId());
+						} else {
+							log.debug("Health check: serverId={}, serviceId={} still DOWN (alert already active)",
+									server.getId(), existingService.getId());
+						}
+					}
+
 					healthStatus.setStatus(serviceUp ? HealthCheckStatus.UP : HealthCheckStatus.DOWN);
 					healthStatus.setTimestamp(LocalDateTime.now());
 					healthStatus.setLastUpdatedDttm(LocalDateTime.now());
 					healthStatus.setLastUpdatedSource("PERIODIC_HEALTH_CHECK");
 					serviceHealthStatusRepository.save(healthStatus);
 					if (runtimeFlag("alert-management.enabled", true)) {
-						alertConfigurationService.evaluate(server.getId(), existingService.getId(),
-								healthStatus.getStatus().name(), healthStatus.getResponseTime());
+						log.info("Triggering alert evaluation for serverId={}, serviceId={},status={}, responseTime={}",server.getId(), existingService.getId(), healthStatus.getStatus().name(), healthStatus.getResponseTime());
+						alertConfigurationService.evaluate(server.getId(), existingService.getId(), healthStatus.getStatus().name(), healthStatus.getResponseTime());
 					}
 				}
 			}
@@ -443,14 +463,11 @@ public class ManageServicesImpl implements ManageServices {
 		boolean isServiceRunning = false;
 		try {
 			ResponseEntity<String> response = httpService.restCall(null, healthCheckUrl, HttpMethod.GET, null, null);
-			log.info("Response : {}", response);
-			log.info("Response Code: {}", response.getStatusCode());
-
-			if (response.getStatusCode().equals(HttpStatus.OK)) {
+			if (response != null && response.getStatusCode().equals(HttpStatus.OK)) {
 				isServiceRunning = true;
 			}
 		} catch (Exception e) {
-			log.error("Error during service health check", e);
+			log.debug("Service health check request failed for {}: {}", healthCheckUrl, e.getMessage());
 		}
 
 		return isServiceRunning;

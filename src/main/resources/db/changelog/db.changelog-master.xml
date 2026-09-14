@@ -35,4 +35,28 @@
     <changeSet id="9-alert-condition-management" author="service-pulse" dbms="mysql">
         <sqlFile path="sql/V9__alert_condition_management.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
     </changeSet>
+
+    <changeSet id="10-add-service-type" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V10__add_service_type.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="11-add-row-actions-to-services" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V11__add_row_actions_to_services.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+
+    <changeSet id="12-add-status-version-columns" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V12__add_status_version_columns.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+    <changeSet id="14-update-services-sdui" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V14__update_services_sdui.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+    <changeSet id="15-fix-services-table-and-modal" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V15__fix_services_table_and_modal.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+    <changeSet id="16-update-service-modal-fields" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V16__update_service_modal_fields.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+    <changeSet id="17-enable-modal-for-all-forms" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V17__enable_modal_for_all_forms.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
 </databaseChangeLog>

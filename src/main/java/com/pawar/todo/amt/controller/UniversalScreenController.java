@@ -32,13 +32,15 @@ public class UniversalScreenController {
         return "generic-screen";
     }
 
-    @GetMapping("/sdui-admin")
-    public String renderSduiAdmin(Model model) {
+    @GetMapping({"/sdui-admin", "/dashboard/sdui-admin"})
+    public String renderSduiAdmin(Model model, HttpServletRequest request) {
+        model.addAttribute("contextPath", request.getContextPath());
         return "sdui-admin";
     }
 
-    @GetMapping("/alert-admin")
-    public String renderAlertAdmin(Model model) {
+    @GetMapping({"/alert-admin", "/dashboard/alert-admin"})
+    public String renderAlertAdmin(Model model, HttpServletRequest request) {
+        model.addAttribute("contextPath", request.getContextPath());
         return "alert-admin";
     }
 }

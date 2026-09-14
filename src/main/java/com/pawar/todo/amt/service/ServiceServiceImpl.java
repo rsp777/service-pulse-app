@@ -123,7 +123,7 @@ public class ServiceServiceImpl implements ServiceService {
 			service.setLastUpdatedDttm(LocalDateTime.now());
 			logger.info("service : {}",service);
 			com.pawar.todo.amt.model.Service savedService = serviceRepository.save(service);
-			upsertServerConfigurations(savedService, servers, request.healthCheckUrl());
+			upsertServerConfigurations(savedService, servers, null);
 			logger.debug("Service created successfully: ID={}", savedService.getId());
 			if (savedService != null) {
 				for (Server server : servers) {
@@ -221,7 +221,7 @@ public class ServiceServiceImpl implements ServiceService {
 				service.setServers(servers);
 			}
 			service.setServiceName(request.serviceName());
-			upsertServerConfigurations(service, requestedServers, request.healthCheckUrl());
+			upsertServerConfigurations(service, requestedServers, null);
 			service.setLastUpdatedDttm(LocalDateTime.now());
 
 			com.pawar.todo.amt.model.Service updatedService = serviceRepository.save(service);

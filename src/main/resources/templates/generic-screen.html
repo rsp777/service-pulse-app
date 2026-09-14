@@ -91,6 +91,114 @@
             .header { align-items: flex-start; flex-direction: column; }
             .span-4, .span-6 { grid-column: span 12; }
         }
+
+        /* ===== Modal overlay ===== */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.55); backdrop-filter: blur(3px);
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-overlay.active { display: flex; animation: modalFadeIn 0.18s ease; }
+        @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-box {
+            background: #fff; border-radius: 12px; width: 100%; max-width: 620px;
+            max-height: 90vh; overflow-y: auto; padding: 32px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            animation: modalSlideUp 0.25s ease;
+        }
+        @keyframes modalSlideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+        .modal-box-header h3 { margin: 0; font-size: 20px; font-weight: 700; }
+        .modal-close {
+            border: 0; background: #f3f4f6; width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: #6b7280; cursor: pointer; transition: all 0.15s;
+        }
+        .modal-close:hover { background: #e5e7eb; color: #111; transform: rotate(90deg); }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+
+        /* ===== Add button ===== */
+        .add-btn {
+            background: linear-gradient(135deg, #10b981, #059669); color: #fff;
+            border: 0; border-radius: 8px; padding: 11px 22px;
+            font: 600 14px/1 "DM Sans", sans-serif; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(16,185,129,0.35); transition: all 0.2s;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .add-btn:hover { background: linear-gradient(135deg, #059669, #047857); transform: translateY(-1px); box-shadow: 0 6px 14px rgba(16,185,129,0.45); }
+        .add-btn:active { transform: translateY(0); }
+
+        /* ===== Status Badges & Version Tags ===== */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .status-badge::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        .status-online, .status-up, .status-active {
+            background: rgba(16, 185, 129, 0.12);
+            color: #059669;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+        .status-online::before, .status-up::before, .status-active::before {
+            background: #10b981;
+            box-shadow: 0 0 6px #10b981;
+        }
+        .status-offline, .status-down, .status-inactive {
+            background: rgba(239, 68, 68, 0.12);
+            color: #dc2626;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+        .status-offline::before, .status-down::before, .status-inactive::before {
+            background: #ef4444;
+        }
+        .status-unknown {
+            background: rgba(107, 114, 128, 0.12);
+            color: #4b5563;
+            border: 1px solid rgba(107, 114, 128, 0.2);
+        }
+        .status-unknown::before {
+            background: #9ca3af;
+        }
+        .status-checking {
+            background: rgba(59, 130, 246, 0.1);
+            color: #2563eb;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            animation: pulse-status 1.5s infinite;
+        }
+        .status-checking::before {
+            background: #3b82f6;
+            animation: pulse-status 1.5s infinite;
+        }
+        @keyframes pulse-status { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .version-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            background: #f1f5f9;
+            color: #334155;
+            border: 1px solid #e2e8f0;
+            font-weight: 500;
+        }
+        .version-fetching {
+            color: #94a3b8;
+            font-style: italic;
+        }
     </style>
 </head>
 <body th:attr="data-context-path=${contextPath}">
@@ -101,8 +209,8 @@
             <nav>
                 <ul class="nav">
                     <li th:each="context : ${dashboardContexts}"><a th:href="@{/dashboard/{context}(context=${context})}" th:attr="aria-current=${context == viewContext ? 'page' : null}" th:text="${context}">Dashboard</a></li>
-                    <li><a href="sdui-admin">⚙️ SDUI Admin</a></li>
-                    <li><a href="alert-admin">🚨 Alert Admin</a></li>
+                    <li><a th:href="@{/dashboard/sdui-admin}">⚙️ SDUI Admin</a></li>
+                    <li><a th:href="@{/dashboard/alert-admin}">🚨 Alert Admin</a></li>
                 </ul>
             </nav>
         </aside>
@@ -150,6 +258,73 @@
         };
         const unwrap = (value) => value && Object.prototype.hasOwnProperty.call(value, 'data') ? value.data : value;
 
+        const fetchRuntimeInfo = async (healthCheckUrl) => {
+            if (!healthCheckUrl) return { status: 'NO_URL', version: '—' };
+            try {
+                const proxyUrl = endpointUrl(`/api/services/runtime-status?url=${encodeURIComponent(healthCheckUrl)}`);
+                const res = await fetch(proxyUrl);
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.data || data;
+                }
+            } catch (e) {}
+
+            const baseUrl = healthCheckUrl.replace(/\/actuator\/health\/?$/, '');
+            let status = 'OFFLINE';
+            let version = 'Unknown';
+            try {
+                const healthRes = await fetch(`${baseUrl}/actuator/health`, { mode: 'cors' });
+                if (healthRes.ok) {
+                    status = 'ONLINE';
+                    try {
+                        const infoRes = await fetch(`${baseUrl}/actuator/info`, { mode: 'cors' });
+                        if (infoRes.ok) {
+                            const infoData = await infoRes.json();
+                            version = infoData?.build?.version || infoData?.build?.project?.version || infoData?.version || 'Unknown';
+                        }
+                    } catch {}
+                }
+            } catch {
+                status = 'OFFLINE';
+            }
+            return { status, version };
+        };
+
+        const formatCell = (column, row) => {
+            const value = row[column.field];
+            const format = column.format || (column.field === 'status' ? 'status' : (column.field === 'version' ? 'version' : null));
+            const rowKey = row.id ?? row.serviceId ?? row.name ?? '';
+
+            if (format === 'status') {
+                const statusVal = String(value || '').toUpperCase();
+                if (statusVal === 'ONLINE' || statusVal === 'UP' || statusVal === 'ACTIVE') {
+                    return `<span class="status-badge status-online" data-status-id="${escapeHtml(rowKey)}">ONLINE</span>`;
+                } else if (statusVal === 'OFFLINE' || statusVal === 'DOWN' || statusVal === 'INACTIVE') {
+                    return `<span class="status-badge status-offline" data-status-id="${escapeHtml(rowKey)}">OFFLINE</span>`;
+                } else if (statusVal === 'NO_URL' || statusVal === 'NO URL') {
+                    return `<span class="status-badge status-unknown" data-status-id="${escapeHtml(rowKey)}">NO URL</span>`;
+                } else if (row.healthCheckUrl) {
+                    return `<span class="status-badge status-checking" data-status-id="${escapeHtml(rowKey)}">Checking...</span>`;
+                } else if (value) {
+                    return `<span class="status-badge status-unknown" data-status-id="${escapeHtml(rowKey)}">${escapeHtml(value)}</span>`;
+                } else {
+                    return `<span class="status-badge status-checking" data-status-id="${escapeHtml(rowKey)}">Checking...</span>`;
+                }
+            }
+
+            if (format === 'version') {
+                if (value && value !== 'Unknown') {
+                    return `<span class="version-tag" data-version-id="${escapeHtml(rowKey)}">${escapeHtml(value)}</span>`;
+                } else if (row.healthCheckUrl) {
+                    return `<span class="version-tag version-fetching" data-version-id="${escapeHtml(rowKey)}">Fetching...</span>`;
+                } else {
+                    return `<span class="version-tag" data-version-id="${escapeHtml(rowKey)}">—</span>`;
+                }
+            }
+
+            return escapeHtml(value);
+        };
+
         const renderTable = async (container) => {
             const config = parseConfig(container);
             const target = container.querySelector('div');
@@ -162,7 +337,7 @@
             const rowActions = config.rowActions || [];
             const header = columns.map(column => `<th>${escapeHtml(column.label || column.field)}</th>`).join('') + (rowActions.length ? '<th></th>' : '');
             const body = rows.map((row, index) => {
-                const cells = columns.map(column => `<td>${escapeHtml(row[column.field])}</td>`).join('');
+                const cells = columns.map(column => `<td>${formatCell(column, row)}</td>`).join('');
                 const buttons = rowActions.map(rowAction => `<button type="button" class="row-action${rowAction.className ? ' ' + escapeHtml(rowAction.className) : ''}" data-row-index="${index}" data-action-label="${escapeHtml(rowAction.label)}">${escapeHtml(rowAction.label)}</button>`).join('');
                 return `<tr>${cells}${rowActions.length ? `<td class="row-actions">${buttons}</td>` : ''}</tr>`;
             }).join('');
@@ -171,6 +346,52 @@
                 const rowAction = rowActions.find(action => action.label === button.dataset.actionLabel);
                 handleRowAction(container, rowAction, Number(button.dataset.rowIndex));
             }));
+
+            // Fetch live runtime status and version for rows
+            const hasRuntimeColumns = columns.some(c => c.field === 'status' || c.field === 'version' || c.format === 'status' || c.format === 'version');
+            if (hasRuntimeColumns) {
+                rows.forEach(row => {
+                    const rowKey = row.id ?? row.serviceId ?? row.name ?? '';
+                    if (!row.healthCheckUrl) {
+                        const statusEl = target.querySelector(`[data-status-id="${rowKey}"]`);
+                        const versionEl = target.querySelector(`[data-version-id="${rowKey}"]`);
+                        if (statusEl && (!row.status || row.status === 'UNKNOWN')) {
+                            statusEl.className = 'status-badge status-unknown';
+                            statusEl.textContent = 'NO URL';
+                        }
+                        if (versionEl && !row.version) {
+                            versionEl.className = 'version-tag';
+                            versionEl.textContent = '—';
+                        }
+                        return;
+                    }
+
+                    fetchRuntimeInfo(row.healthCheckUrl).then(info => {
+                        const statusEl = target.querySelector(`[data-status-id="${rowKey}"]`);
+                        const versionEl = target.querySelector(`[data-version-id="${rowKey}"]`);
+                        if (statusEl) {
+                            const isUp = info.status === 'ONLINE' || info.status === 'UP';
+                            statusEl.className = `status-badge ${isUp ? 'status-online' : 'status-offline'}`;
+                            statusEl.textContent = isUp ? 'ONLINE' : 'OFFLINE';
+                        }
+                        if (versionEl) {
+                            versionEl.className = 'version-tag';
+                            versionEl.textContent = info.version || 'Unknown';
+                        }
+                    }).catch(() => {
+                        const statusEl = target.querySelector(`[data-status-id="${rowKey}"]`);
+                        const versionEl = target.querySelector(`[data-version-id="${rowKey}"]`);
+                        if (statusEl) {
+                            statusEl.className = 'status-badge status-offline';
+                            statusEl.textContent = 'OFFLINE';
+                        }
+                        if (versionEl) {
+                            versionEl.className = 'version-tag';
+                            versionEl.textContent = 'Unknown';
+                        }
+                    });
+                });
+            }
         };
 
         const handleRowAction = async (container, rowAction, rowIndex) => {
@@ -179,23 +400,61 @@
             try {
                 if (rowAction.type === 'state') {
                     state[rowAction.stateKey] = row[rowAction.field || 'id'];
+                    // Find the form whose idStateKey matches this row action's stateKey
+                    const allForms = Array.from(document.querySelectorAll('.sdui-form'));
+                    const targetForm = allForms.find(f => {
+                        try { return JSON.parse(f.dataset.config || '{}').idStateKey === rowAction.stateKey; }
+                        catch { return false; }
+                    });
+                    if (targetForm) {
+                        if (targetForm._openModal) targetForm._openModal();
+                        await loadFormValues(targetForm).catch(() => {});
+                    }
+                    return;
+                }
+                if (rowAction.type === 'action') {
+                    // Row fields are merged with global state for URL interpolation
+                    const lookup = { ...state, ...row };
+                    const url = endpointUrl(interpolateWith(rowAction.endpoint, lookup));
+                    const method = (rowAction.method || 'POST').toUpperCase();
+                    if (method === 'GET' && url.includes('/stream')) {
+                        streamAction(url);
+                        return;
+                    }
+                    if (method === 'GET') {
+                        terminal.textContent = `Fetching logs...`;
+                        const response = await fetch(url);
+                        const result = await response.json().catch(() => ({}));
+                        if (!response.ok) throw new Error(result.message || 'Request failed');
+                        terminal.textContent = typeof result.data === 'string' ? result.data : JSON.stringify(result.data || result, null, 2);
+                        return;
+                    }
+                    terminal.textContent = `Executing ${rowAction.label}...`;
+                    const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' } });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.message || `${rowAction.label} failed`);
+                    terminal.textContent = result.data || result.message || `${rowAction.label} completed`;
+                    toast('success', result.message || `${rowAction.label} completed`);
                     await refreshDependents();
                     return;
                 }
                 if (rowAction.type === 'delete') {
                     if (rowAction.confirm) {
                         const message = typeof rowAction.confirm === 'string' ? rowAction.confirm : 'Delete this record?';
-                        const result = await Swal.fire({ title: message, icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete' });
+                        const result = await Swal.fire({ title: message, icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ef4444' });
                         if (!result.isConfirmed) return;
                     }
-                    const url = endpointUrl(interpolateWith(rowAction.endpoint, { rowId: row[rowAction.field || 'id'] }));
+                    // Interpolate using both row fields and {rowId} alias
+                    const lookup = { ...state, ...row, rowId: row[rowAction.field || 'id'] };
+                    const url = endpointUrl(interpolateWith(rowAction.endpoint, lookup));
                     const response = await fetch(url, { method: 'DELETE' });
                     if (!response.ok) throw new Error('Delete failed');
-                    toast('success', 'Deleted');
+                    toast('success', 'Deleted successfully');
                     await refreshDependents();
                 }
             } catch (error) { toast('error', error.message); }
         };
+
 
         const buildPayload = (form, config) => {
             const payload = { ...(config.defaults || {}) };
@@ -224,6 +483,7 @@
                 if (field.type === 'checkbox') input.checked = Boolean(value);
                 else input.value = value ?? '';
             });
+            return true;
         };
 
         const renderForm = async (form) => {
@@ -252,6 +512,48 @@
                 return `<label>${escapeHtml(field.label || field.name)}<input name="${escapeHtml(field.name)}" type="${escapeHtml(field.type || 'text')}" ${field.required ? 'required' : ''}></label>`;
             }));
             form.innerHTML += fields.join('') + (config.stateOnly ? '' : `<button class="action" type="submit">${escapeHtml(config.submitLabel || 'Save')}</button>`);
+
+            if (config.modal) {
+                // 1. Replace the form in the DOM with just the trigger button
+                const triggerBtn = document.createElement('button');
+                triggerBtn.type = 'button';
+                triggerBtn.className = 'add-btn';
+                triggerBtn.innerHTML = `<span>+</span> ${escapeHtml(config.addLabel || 'Add')}`;
+                form.parentNode.replaceChild(triggerBtn, form);
+
+                // 2. Build the modal and append to <body> so position:fixed works
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay';
+                overlay.innerHTML = `
+                    <div class="modal-box">
+                        <div class="modal-box-header">
+                            <h3>${escapeHtml(config.addLabel || 'Form')}</h3>
+                            <button type="button" class="modal-close" title="Close">&times;</button>
+                        </div>
+                        <div class="modal-body-slot"></div>
+                        <div class="modal-footer">
+                            <button type="button" class="modal-close action" style="background:#e5e7eb;color:#374151">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                overlay.querySelector('.modal-body-slot').appendChild(form);
+                document.body.appendChild(overlay);
+
+                const openModal = () => { overlay.classList.add('active'); }
+                const closeModal = () => {
+                    overlay.classList.remove('active');
+                    if (config.idStateKey) state[config.idStateKey] = '';
+                    form.reset();
+                };
+
+                triggerBtn.addEventListener('click', openModal);
+                overlay.querySelectorAll('.modal-close').forEach(btn => btn.addEventListener('click', closeModal));
+                overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+                document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && overlay.classList.contains('active')) closeModal(); });
+
+                form._closeModal = closeModal;
+                form._openModal = openModal;
+            }
 
             (config.fields || []).forEach(field => {
                 const input = form.elements.namedItem(field.name);
@@ -288,6 +590,7 @@
                     if (config.outputTarget === 'terminal') appendOutput(typeof result.data === 'string' ? result.data : JSON.stringify(result, null, 2));
                     toast('success', result.message || 'Saved');
                     if (config.resetStateOnSuccess && config.idStateKey) state[config.idStateKey] = '';
+                    if (form._closeModal) form._closeModal();
                     await refreshDependents();
                 } catch (error) { toast('error', error.message); }
             });
@@ -295,7 +598,14 @@
 
         const refreshDependents = async () => {
             await Promise.all(Array.from(document.querySelectorAll('.sdui-table')).map(table => renderTable(table).catch(error => table.querySelector('div').textContent = error.message)));
-            await Promise.all(Array.from(document.querySelectorAll('.sdui-form')).map(form => loadFormValues(form).catch(() => {})));
+            await Promise.all(Array.from(document.querySelectorAll('.sdui-form')).map(async form => {
+                try {
+                    const loaded = await loadFormValues(form);
+                    if (loaded && form._openModal && !form.closest('.modal').classList.contains('active')) {
+                        form._openModal();
+                    }
+                } catch (e) { }
+            }));
         };
 
         const streamAction = (url) => {

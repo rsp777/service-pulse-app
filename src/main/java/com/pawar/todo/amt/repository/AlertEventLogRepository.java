@@ -12,4 +12,5 @@ public interface AlertEventLogRepository extends JpaRepository<AlertEventLog, In
     List<AlertEventLog> findByAlertIdOrderByTriggeredDttmDesc(Integer alertId);
     List<AlertEventLog> findByTriggeredDttmBetweenOrderByTriggeredDttmDesc(LocalDateTime start, LocalDateTime end);
     List<AlertEventLog> findByAlertStatusOrderByTriggeredDttmDesc(String alertStatus);
+    List<AlertEventLog> findAllByOrderByTriggeredDttmDesc();
 }

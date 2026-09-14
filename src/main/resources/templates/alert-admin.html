@@ -134,9 +134,9 @@
         <aside style="width: 250px; background: #1a1f35; color: #fff; padding: 20px; overflow-y: auto;">
             <h2 style="margin: 0 0 20px; font-size: 18px;">Service Pulse</h2>
             <nav style="list-style: none; padding: 0; margin: 0;">
-                <a href="/service-pulse-app/dashboard/dashboard" style="display: block; padding: 10px; margin-bottom: 8px; color: #ccc; border-radius: 4px;">📊 Dashboard</a>
-                <a href="/service-pulse-app/sdui-admin" style="display: block; padding: 10px; margin-bottom: 8px; color: #ccc; border-radius: 4px;">⚙️ SDUI Admin</a>
-                <a href="/service-pulse-app/alert-admin" style="display: block; padding: 10px; margin-bottom: 8px; color: #fff; background: rgba(14,165,233,0.1); border-radius: 4px;">🚨 Alert Admin</a>
+                <a th:href="@{/dashboard/dashboard}" href="/service-pulse-app/dashboard/dashboard" style="display: block; padding: 10px; margin-bottom: 8px; color: #ccc; border-radius: 4px;">📊 Dashboard</a>
+                <a th:href="@{/dashboard/sdui-admin}" href="/service-pulse-app/dashboard/sdui-admin" style="display: block; padding: 10px; margin-bottom: 8px; color: #ccc; border-radius: 4px;">⚙️ SDUI Admin</a>
+                <a th:href="@{/dashboard/alert-admin}" href="/service-pulse-app/dashboard/alert-admin" style="display: block; padding: 10px; margin-bottom: 8px; color: #fff; background: rgba(14,165,233,0.1); border-radius: 4px;">🚨 Alert Admin</a>
             </nav>
         </aside>
 
@@ -265,7 +265,7 @@
                 const res = await fetch(`${API_BASE}/alerts/condition-types`);
                 const types = await res.json();
                 const tbody = document.querySelector('#typesTable tbody');
-                tbody.innerHTML = types.map(t => `
+                tbody.innerHTML = (Array.isArray(types) ? types : []).map(t => `
                     <tr style="border-bottom: 1px solid #e5e7eb;">
                         <td style="padding: 8px;">${t.condition_type_name || t.name || ''}</td>
                         <td style="padding: 8px;">${t.description || '—'}</td>

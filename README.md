@@ -35,14 +35,38 @@ The Service Pulse App is a Spring Boot application designed to monitor the healt
 *   Java 21
 *   Apache Maven
 
+### Development Mode
+To run the application locally in development mode, use the following Maven command:
+```bash
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
 ### Building the Application
+
+#### Standard Build (JVM)
 ```bash
 mvn clean install
 ```
 
-### Running the Application
+#### GraalVM Native Image Build
+To build a GraalVM native image, ensure you have GraalVM installed and `JAVA_HOME` set to the GraalVM installation directory (e.g., `C:\Users\Ravi\Downloads\graalvm-jdk-21_windows-x64_bin\graalvm-jdk-21.0.12+7.1`). You must also run this from a Native Tools Command Prompt (Visual Studio) on Windows.
+
 ```bash
-java -jar target/service-pulse-app-0.0.1-SNAPSHOT.jar
+$env:JAVA_HOME="C:\Users\Ravi\Downloads\graalvm-jdk-21_windows-x64_bin\graalvm-jdk-21.0.12+7.1"
+mvn clean -Pnative native:compile
+```
+
+### Running the Application
+
+#### Standard JVM execution
+```bash
+java -jar target/service-pulse-app-0.0.2.jar
+```
+
+#### GraalVM Native Image execution
+After a successful native compile, an executable will be generated in the `target` directory.
+```bash
+.\target\service-pulse-app.exe
 ```
 
 ### SSH Configuration

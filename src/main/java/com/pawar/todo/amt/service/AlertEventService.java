@@ -53,6 +53,13 @@ public class AlertEventService {
     }
 
     /**
+     * Get all alert events
+     */
+    public List<AlertEventLog> getAllAlertEvents() {
+        return eventLogRepository.findAllByOrderByTriggeredDttmDesc();
+    }
+
+    /**
      * Get alert events within a date range
      */
     public List<AlertEventLog> getAlertEventsByDateRange(LocalDateTime start, LocalDateTime end) {

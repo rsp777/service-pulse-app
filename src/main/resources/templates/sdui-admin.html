@@ -53,12 +53,14 @@
         @media (max-width: 800px) { .app { display: block; } .sidebar { width: auto; padding: 14px; } .brand { padding: 0 8px 12px; } .nav { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; } .nav li { flex: 1 1 auto; } .nav a { border: 0; padding: 9px; text-align: center; } .main { padding: 18px; } .header { align-items: flex-start; flex-direction: column; } .form-grid { grid-template-columns: 1fr; } .button-group { flex-direction: column; } }
     </style>
 </head>
-<body>
+<body th:attr="data-context-path=${contextPath}">
     <div class="app">
         <aside class="sidebar">
             <div class="brand"><h1>Service Pulse</h1><p>SDUI Admin</p></div>
             <nav><ul class="nav" id="navList">
-                <li><a href="sdui-admin" aria-current="page">⚙️ SDUI Admin</a></li>
+                <li><a th:href="@{/dashboard/dashboard}">📊 Dashboard</a></li>
+                <li><a th:href="@{/dashboard/sdui-admin}" aria-current="page">⚙️ SDUI Admin</a></li>
+                <li><a th:href="@{/dashboard/alert-admin}">🚨 Alert Admin</a></li>
             </ul></nav>
             <nav style="margin-top: 16px; border-top: 1px solid #ffffff26; padding-top: 16px;"><ul class="nav"><li style="padding: 0 22px; color: #b8d4d8; font-size: 12px; font-weight: 700; text-transform: uppercase;">Dashboards</li><li id="dashboardNav"></li></ul></nav>
         </aside>
@@ -141,7 +143,12 @@
     </div>
 
     <script>
-        const contextPath = /*[[${#request.contextPath}]]*/ '';
+        const contextPath = document.body.dataset.contextPath || '';
+        const endpointUrl = (endpoint) => {
+            if (!endpoint) return '';
+            if (/^https?:\/\//i.test(endpoint)) return endpoint;
+            return `${contextPath}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+        };
         const formTitle = document.getElementById('formTitle');
         const actionForm = document.getElementById('actionForm');
         const actionId = document.getElementById('actionId');
@@ -165,7 +172,7 @@
         if (params.returnTo) {
             const dashboardName = params.returnTo.split('/').pop() || 'Dashboard';
             const backLink = document.createElement('a');
-            backLink.href = contextPath + params.returnTo;
+            backLink.href = endpointUrl(params.returnTo);
             backLink.style.cssText = 'color: #55c2cf; font-weight: 600; text-decoration: underline; cursor: pointer;';
             backLink.textContent = `← Back to ${dashboardName}`;
             contextInfo.appendChild(backLink);
@@ -181,13 +188,13 @@
 
         const loadDashboardContexts = async () => {
             try {
-                const response = await fetch('/api/sdui/actions');
+                const response = await fetch(endpointUrl('/api/sdui/actions'));
                 if (!response.ok) return;
                 const actions = await response.json();
                 const contexts = [...new Set(actions.map(a => a.viewContext).filter(Boolean))].sort();
-                
+                console.log(`contexts`, `${contexts}`);
                 const navHtml = contexts.map(context => 
-                    `<li><a href="/dashboard/${encodeURIComponent(context)}" style="border-left: 3px solid transparent; text-transform: capitalize;">${escapeHtml(context)}</a></li>`
+                    `<li><a href="${endpointUrl('/dashboard/' + encodeURIComponent(context))}" style="border-left: 3px solid transparent; text-transform: capitalize;">${escapeHtml(context)}</a></li>`
                 ).join('');
                 dashboardNav.innerHTML = navHtml;
             } catch (error) {
@@ -197,7 +204,7 @@
 
         const loadActions = async () => {
             try {
-                const response = await fetch('/api/sdui/actions');
+                const response = await fetch(endpointUrl('/api/sdui/actions'));
                 if (!response.ok) throw new Error('Failed to load actions');
                 const actions = await response.json();
                 renderTable(actions);
@@ -275,7 +282,7 @@
             if (!result.isConfirmed) return;
             
             try {
-                const response = await fetch(`/api/sdui/actions/${id}`, { method: 'DELETE' });
+                const response = await fetch(endpointUrl(`/api/sdui/actions/${id}`), { method: 'DELETE' });
                 if (!response.ok) throw new Error('Delete failed');
                 toast('success', 'Action deleted');
                 await loadActions();
@@ -325,7 +332,7 @@
                 };
 
                 const method = id ? 'PUT' : 'POST';
-                const url = id ? `/api/sdui/actions/${id}` : '/api/sdui/actions';
+                const url = endpointUrl(id ? `/api/sdui/actions/${id}` : '/api/sdui/actions');
                 const response = await fetch(url, {
                     method,
                     headers: { 'Content-Type': 'application/json' },
