@@ -23,9 +23,57 @@ public class ServiceController {
 	private static final Logger auditLogger = LoggerFactory.getLogger("AUDIT_LOGGER");
 
 	private final ServiceService serviceService;
+	private final com.pawar.sop.http.service.HttpService httpService;
 
-	public ServiceController(ServiceService serviceService) {
+	public ServiceController(ServiceService serviceService, com.pawar.sop.http.service.HttpService httpService) {
 		this.serviceService = serviceService;
+		this.httpService = httpService;
+	}
+
+	@GetMapping("/runtime-status")
+	public ResponseEntity<java.util.Map<String, String>> getRuntimeStatus(@RequestParam(required = false) String url) {
+		if (url == null || url.trim().isEmpty()) {
+			return ResponseEntity.ok(java.util.Map.of("status", "NO_URL", "version", "—"));
+		}
+
+		String cleanUrl = url.trim();
+		String baseUrl = cleanUrl.replaceAll("/actuator/health/?$", "");
+		String status = "OFFLINE";
+		String version = "—";
+
+		try {
+			String healthUrl = cleanUrl.contains("/actuator/") ? (baseUrl + "/actuator/health") : cleanUrl;
+			ResponseEntity<String> healthResponse = httpService.restCall(null, healthUrl, org.springframework.http.HttpMethod.GET, null, null);
+			if (healthResponse != null && healthResponse.getStatusCode().is2xxSuccessful()) {
+				status = "ONLINE";
+				version = "Unknown";
+
+				if (cleanUrl.contains("/actuator/")) {
+					try {
+						String infoUrl = baseUrl + "/actuator/info";
+						ResponseEntity<String> infoResponse = httpService.restCall(null, infoUrl, org.springframework.http.HttpMethod.GET, null, null);
+						if (infoResponse != null && infoResponse.getStatusCode().is2xxSuccessful() && infoResponse.getBody() != null) {
+							com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(infoResponse.getBody());
+							if (root.hasNonNull("build") && root.get("build").hasNonNull("version")) {
+								version = root.get("build").get("version").asText();
+							} else if (root.hasNonNull("build") && root.get("build").hasNonNull("project") && root.get("build").get("project").hasNonNull("version")) {
+								version = root.get("build").get("project").get("version").asText();
+							} else if (root.hasNonNull("version")) {
+								version = root.get("version").asText();
+							} else if (root.hasNonNull("git") && root.get("git").hasNonNull("build") && root.get("git").get("build").hasNonNull("version")) {
+								version = root.get("git").get("build").get("version").asText();
+							}
+						}
+					} catch (Exception ignored) {
+					}
+				}
+			}
+		} catch (Exception e) {
+			status = "OFFLINE";
+			version = "—";
+		}
+
+		return ResponseEntity.ok(java.util.Map.of("status", status, "version", version));
 	}
 
 	@PostMapping

@@ -64,6 +64,7 @@ public class ServiceMapper {
 	private void populateServiceFromRequestDto(ServiceRequestDto dto, Service service) {
 		logger.info("Populating Service entity from ServiceRequestDto: {}", dto);
 		service.setServiceName(dto.serviceName());
+		service.setServiceType(dto.serviceType());
 		logger.debug("Set serviceName: {}", dto.serviceName());
 
 		Set<ServerResponseDto> serverResponseDtos = dto.servers();
@@ -93,7 +94,7 @@ public class ServiceMapper {
 		logger.debug("Set serviceName: {}", dto.serviceName());
 
 		Set<ServerResponseDto> serverResponseDtos = dto.servers();
-		if (serverResponseDtos !=null && !serverResponseDtos.isEmpty()) {
+		if (serverResponseDtos != null && !serverResponseDtos.isEmpty()) {
 
 			Set<Server> servers = new HashSet<>();
 			for (ServerResponseDto serverResponseDto : serverResponseDtos) {
@@ -118,20 +119,20 @@ public class ServiceMapper {
 			return null;
 		}
 
-//		Set<Server> servers = entity.getServers();
-//		Set<ServerResponseDto> serverResponseDtos = new HashSet<>();
-//		if (servers != null) {
-//
-//			if (!servers.isEmpty()) {
-//				for (Iterator iterator = servers.iterator(); iterator.hasNext();) {
-//					Server server = (Server) iterator.next();
-//
-//					ServerResponseDto serverResponseDto = serverMapper.toDto(server);
-//					serverResponseDtos.add(serverResponseDto);
-//
-//				}
-//			}
-//		}
+		// Set<Server> servers = entity.getServers();
+		// Set<ServerResponseDto> serverResponseDtos = new HashSet<>();
+		// if (servers != null) {
+		//
+		// if (!servers.isEmpty()) {
+		// for (Iterator iterator = servers.iterator(); iterator.hasNext();) {
+		// Server server = (Server) iterator.next();
+		//
+		// ServerResponseDto serverResponseDto = serverMapper.toDto(server);
+		// serverResponseDtos.add(serverResponseDto);
+		//
+		// }
+		// }
+		// }
 
 		ServiceResponseDto dto = new ServiceResponseDto(entity.getId(), null, entity.getServiceName(),
 				entity.getCreatedDttm(),
@@ -179,7 +180,7 @@ public class ServiceMapper {
 			}
 		}
 		ServiceRequestDto dto = new ServiceRequestDto(entity.getId(), serverResponseDtos, entity.getServiceName(),
-				null, entity.getCreatedDttm(),
+				entity.getServiceType(),null, entity.getCreatedDttm(),
 				entity.getLastUpdatedDttm(), entity.getCreatedSource(), entity.getLastUpdatedSource());
 
 		logger.debug("Created ServiceResponseDto with values: {}", String.format("id=%s, ServiceName=%s, Servers=%s",

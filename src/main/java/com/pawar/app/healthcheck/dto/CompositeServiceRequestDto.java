@@ -1,16 +1,13 @@
-package com.pawar.todo.amt.response;
+package com.pawar.app.healthcheck.dto;
 
-public record ServerServiceConfigurationResponse(
+public record CompositeServiceRequestDto(
         Integer id,
         Integer serverId,
-        Integer serviceId,
         String serviceName,
         String serviceType,
-        String healthCheckUrl,
         String logsPath,
         String scriptsPath,
         Integer actuatorPort,
         String contextPath,
-        String status,
-        String version) {
-}
+        String healthCheckUrl
+) {}

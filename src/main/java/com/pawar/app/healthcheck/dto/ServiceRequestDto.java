@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 public record ServiceRequestDto(Integer id, Set<ServerResponseDto> servers, String serviceName,
+        String serviceType,
         String healthCheckUrl, LocalDateTime createdDttm, LocalDateTime lastUpdatedDttm,
         String createdSource, String lastUpdatedSource) {
 }

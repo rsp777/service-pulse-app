@@ -2,10 +2,7 @@ package com.pawar.todo.amt.validator;
 
 import org.springframework.stereotype.Component;
 
-import com.pawar.todo.amt.constants.AgentStatus;
-import com.pawar.todo.amt.constants.CommandStatus;
 import com.pawar.todo.amt.constants.HttpMethodName;
-import com.pawar.todo.amt.constants.ServerStatus;
 
 @Component
 public class HttpMethodNameValidator {

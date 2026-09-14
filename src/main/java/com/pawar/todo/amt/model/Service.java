@@ -43,6 +43,10 @@ public class Service {
 	@Column(name = "serviceName")
 	private String serviceName;
 
+	@JsonProperty("serviceType")
+	@Column(name = "service_type")
+	private String serviceType;
+
 	@JsonInclude(value = Include.CUSTOM)
 	@JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
 	@JsonProperty("createdDttm")

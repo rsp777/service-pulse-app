@@ -8,4 +8,8 @@ import com.pawar.todo.amt.model.AlertEvent;
 
 public interface AlertEventRepository extends JpaRepository<AlertEvent, Integer> {
     List<AlertEvent> findTop50ByOrderByTriggeredDttmDesc();
+    List<AlertEvent> findByAlertIdAndServerIdAndServiceIdAndStatus(Integer alertId, Integer serverId, Integer serviceId, String status);
+    List<AlertEvent> findByServerIdAndServiceIdAndStatus(Integer serverId, Integer serviceId, String status);
+    boolean existsByServerIdAndServiceIdAndStatus(Integer serverId, Integer serviceId, String status);
+    boolean existsByAlertIdAndServerIdAndServiceIdAndStatus(Integer alertId, Integer serverId, Integer serviceId, String status);
 }

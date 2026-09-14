@@ -51,12 +51,14 @@ public class AlertEventController {
     }
 
     /**
-     * Get alert events for a specific alert
+     * Get alert events for a specific alert or all events
      */
     @GetMapping("/event-logs")
-    public ResponseEntity<List<AlertEventLog>> getAlertEvents(@RequestParam Integer alertId) {
+    public ResponseEntity<List<AlertEventLog>> getAlertEvents(@RequestParam(required = false) Integer alertId) {
         try {
-            List<AlertEventLog> events = alertEventService.getAlertEvents(alertId);
+            List<AlertEventLog> events = alertId != null 
+                    ? alertEventService.getAlertEvents(alertId) 
+                    : alertEventService.getAllAlertEvents();
             return ResponseEntity.ok(events);
         } catch (Exception error) {
             logger.warn("Failed to fetch alert events: {}", error.getMessage());
