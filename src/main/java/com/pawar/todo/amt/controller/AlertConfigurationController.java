@@ -36,6 +36,21 @@ public class AlertConfigurationController {
     @GetMapping("/events")
     public List<AlertEventResponse> events() { return service.findRecentEvents().stream().map(this::toResponse).toList(); }
 
+    @GetMapping("/events/unread")
+    public List<AlertEventResponse> unreadEvents() { return service.findUnreadEvents().stream().map(this::toResponse).toList(); }
+
+    @PutMapping("/events/{id}/read")
+    public ResponseEntity<ApiResponse<String>> markAsRead(@PathVariable Integer id) {
+        service.markAsRead(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Marked as read", null));
+    }
+
+    @PutMapping("/events/read-all")
+    public ResponseEntity<ApiResponse<String>> markAllAsRead() {
+        service.markAllAsRead();
+        return ResponseEntity.ok(new ApiResponse<>(true, "Marked all as read", null));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<String>> create(@RequestBody AlertConfigurationRequest request) {
         log.info("Creating new alert rule: name='{}'", request.name());
@@ -57,12 +72,19 @@ public class AlertConfigurationController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Alert deleted successfully", null));
     }
 
+    @PutMapping("/{id}/toggle")
+    public ResponseEntity<ApiResponse<String>> toggle(@PathVariable Integer id) {
+        log.info("Toggling alert rule id={}", id);
+        boolean newState = service.toggle(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Alert " + (newState ? "enabled" : "disabled") + " successfully", null));
+    }
+
     private AlertConfigurationResponse toResponse(AlertConfiguration alert) {
         return new AlertConfigurationResponse(alert.getId(), alert.getName(), alert.getTargetType(), alert.getServerId(), alert.getServiceId(),
                 alert.getConditionType(), alert.getOperator(), alert.getConditionValue(), alert.isEnabled(), alert.getCreatedDttm(), alert.getLastUpdatedDttm());
     }
 
     private AlertEventResponse toResponse(AlertEvent event) {
-        return new AlertEventResponse(event.getId(), event.getAlertId(), event.getServerId(), event.getServiceId(), event.getMessage(), event.getStatus(), event.getTriggeredDttm());
+        return new AlertEventResponse(event.getId(), event.getAlertId(), event.getServerId(), event.getServiceId(), event.getMessage(), event.getStatus(), event.isRead(), event.getTriggeredDttm());
     }
 }

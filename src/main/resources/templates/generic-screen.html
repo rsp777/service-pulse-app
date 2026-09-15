@@ -215,6 +215,23 @@
         .log-level-info  { color: #e2e8f0; }
         .log-level-debug { color: #94a3b8; }
         .log-level-trace { color: #64748b; }
+        
+        /* ===== Notifications ===== */
+        .header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .notifications { position: relative; }
+        .notification-bell { background: none; border: none; font-size: 20px; cursor: pointer; position: relative; padding: 8px; }
+        .notification-badge { position: absolute; top: 0; right: 0; background: #ef4444; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; font-weight: bold; }
+        .notification-dropdown { position: absolute; top: 100%; right: 0; width: 320px; background: white; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; max-height: 400px; }
+        .notification-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+        .notification-header h4 { margin: 0; font-size: 14px; }
+        .mark-all-read { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; }
+        .notification-list { overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notification-item { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+        .notification-item.unread { background: #f8fafc; }
+        .notification-item p { margin: 0; font-size: 13px; color: var(--ink); }
+        .notification-item .time { font-size: 11px; color: #64748b; }
+        .notification-item .mark-read { align-self: flex-start; background: none; border: none; color: var(--accent); cursor: pointer; font-size: 11px; padding: 0; margin-top: 4px; }
+        .notification-item.unread p { font-weight: 600; }
     </style>
 </head>
 <body th:attr="data-context-path=${contextPath}">
@@ -231,7 +248,21 @@
             </nav>
         </aside>
         <main class="main">
-            <header class="header"><div><h2 th:text="${viewContext}">Dashboard</h2><p>Service monitoring and remote operations</p></div></header>
+            <header class="header">
+                <div><h2 th:text="${viewContext}">Dashboard</h2><p>Service monitoring and remote operations</p></div>
+                <div class="notifications">
+                    <button id="notification-bell" class="notification-bell" aria-label="Notifications">
+                        🔔<span id="notification-badge" class="notification-badge" style="display: none;">0</span>
+                    </button>
+                    <div id="notification-dropdown" class="notification-dropdown" style="display: none;">
+                        <div class="notification-header">
+                            <h4>Notifications</h4>
+                            <button id="mark-all-read" class="mark-all-read">Mark all as read</button>
+                        </div>
+                        <div id="notification-list" class="notification-list"></div>
+                    </div>
+                </div>
+            </header>
             <section class="content">
                 <section class="panel" th:each="category : ${dashboardActions}">
                     <h2 th:text="${category.key}">Category</h2>
@@ -342,6 +373,10 @@
                     return `<span class="version-tag" data-version-id="${escapeHtml(rowKey)}">—</span>`;
                 }
             }
+            if (format === 'toggle') {
+                const isChecked = !!value;
+                return `<input type="checkbox" class="sdui-toggle" data-row-id="${escapeHtml(rowKey)}" ${isChecked ? 'checked' : ''} />`;
+            }
 
             return escapeHtml(value);
         };
@@ -366,6 +401,18 @@
             target.querySelectorAll('.row-action').forEach(button => button.addEventListener('click', () => {
                 const rowAction = rowActions.find(action => action.label === button.dataset.actionLabel);
                 handleRowAction(container, rowAction, Number(button.dataset.rowIndex));
+            }));
+
+            target.querySelectorAll('.sdui-toggle').forEach(checkbox => checkbox.addEventListener('change', async (e) => {
+                const id = e.target.dataset.rowId;
+                try {
+                    const res = await fetch(endpointUrl('/api/alerts/' + id + '/toggle'), { method: 'PUT' });
+                    if (!res.ok) throw new Error();
+                    toast('success', 'Alert updated');
+                } catch {
+                    e.target.checked = !e.target.checked;
+                    toast('error', 'Failed to update alert');
+                }
             }));
 
             // Fetch live runtime status and version for rows
@@ -481,7 +528,7 @@
             const payload = { ...(config.defaults || {}) };
             (config.fields || []).forEach(field => {
                 const input = form.elements.namedItem(field.name);
-                if (!input) return;
+                if (!input || input.disabled) return; // skip hidden/disabled conditional fields
                 if (field.type === 'checkbox') payload[field.name] = input.checked;
                 else if (field.type === 'number') payload[field.name] = input.value === '' ? null : Number(input.value);
                 else payload[field.name] = input.value;
@@ -518,6 +565,7 @@
                     options = unwrap(await response.json()) || [];
                 }
                 optionCache[field.name] = options;
+                let fieldHtml;
                 if (field.type === 'select') {
                     const blank = field.includeBlankOption ? [{ [field.optionValue || 'id']: '', [field.optionLabel || 'name']: field.blankLabel || 'Select...' }] : [];
                     const optionMarkup = blank.concat(options).map(option => {
@@ -525,14 +573,47 @@
                         const label = typeof option === 'object' ? option[field.optionLabel || 'name'] : option;
                         return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
                     }).join('');
-                    return `<label>${escapeHtml(field.label || field.name)}<select name="${escapeHtml(field.name)}" ${field.required ? 'required' : ''}>${optionMarkup}</select></label>`;
+                    fieldHtml = `<label>${escapeHtml(field.label || field.name)}<select name="${escapeHtml(field.name)}" ${field.required ? 'required' : ''}>${optionMarkup}</select></label>`;
+                } else if (field.type === 'checkbox') {
+                    fieldHtml = `<label class="checkbox-field"><input name="${escapeHtml(field.name)}" type="checkbox"> ${escapeHtml(field.label || field.name)}</label>`;
+                } else if (field.type === 'textarea') {
+                    fieldHtml = `<label>${escapeHtml(field.label || field.name)}<textarea name="${escapeHtml(field.name)}" ${field.required ? 'required' : ''}></textarea></label>`;
+                } else if (field.type === 'hidden') {
+                    fieldHtml = `<input type="hidden" name="${escapeHtml(field.name)}">`;
+                } else {
+                    fieldHtml = `<label>${escapeHtml(field.label || field.name)}<input name="${escapeHtml(field.name)}" type="${escapeHtml(field.type || 'text')}" ${field.required ? 'required' : ''}></label>`;
                 }
-                if (field.type === 'checkbox') return `<label class="checkbox-field"><input name="${escapeHtml(field.name)}" type="checkbox"> ${escapeHtml(field.label || field.name)}</label>`;
-                if (field.type === 'textarea') return `<label>${escapeHtml(field.label || field.name)}<textarea name="${escapeHtml(field.name)}" ${field.required ? 'required' : ''}></textarea></label>`;
-                if (field.type === 'hidden') return `<input type="hidden" name="${escapeHtml(field.name)}">`;
-                return `<label>${escapeHtml(field.label || field.name)}<input name="${escapeHtml(field.name)}" type="${escapeHtml(field.type || 'text')}" ${field.required ? 'required' : ''}></label>`;
+                if (field.visibleWhen) {
+                    fieldHtml = `<div class="sdui-field-wrapper" data-vw-field="${escapeHtml(field.visibleWhen.field)}" data-vw-value="${escapeHtml(field.visibleWhen.value)}">${fieldHtml}</div>`;
+                }
+                return fieldHtml;
             }));
             form.innerHTML += fields.join('') + (config.stateOnly ? '' : `<button class="action" type="submit">${escapeHtml(config.submitLabel || 'Save')}</button>`);
+
+            // ── Conditional field visibility (visibleWhen) ─────────────────
+            const applyFieldVisibility = () => {
+                form.querySelectorAll('.sdui-field-wrapper[data-vw-field]').forEach(wrapper => {
+                    const controlName = wrapper.dataset.vwField;
+                    const expected    = wrapper.dataset.vwValue;
+                    const control     = form.elements.namedItem(controlName);
+                    const visible     = control && control.value === expected;
+                    wrapper.style.display = visible ? '' : 'none';
+                    // Disable hidden inputs so they're excluded from browser validation
+                    // and from buildPayload
+                    wrapper.querySelectorAll('input, select, textarea')
+                        .forEach(inp => { inp.disabled = !visible; });
+                });
+            };
+            applyFieldVisibility();
+            // Bind change listeners on all controlling fields
+            const controllerFields = new Set(
+                Array.from(form.querySelectorAll('.sdui-field-wrapper[data-vw-field]'))
+                    .map(w => w.dataset.vwField)
+            );
+            controllerFields.forEach(name => {
+                const ctrl = form.elements.namedItem(name);
+                if (ctrl) ctrl.addEventListener('change', applyFieldVisibility);
+            });
 
             if (config.modal) {
                 // 1. Replace the form in the DOM with just the trigger button
@@ -751,6 +832,93 @@
                 output.textContent = `Error loading logs: ${err.message}`;
             }
         };
+
+        const initNotifications = () => {
+            const bell = document.getElementById('notification-bell');
+            const badge = document.getElementById('notification-badge');
+            const dropdown = document.getElementById('notification-dropdown');
+            const list = document.getElementById('notification-list');
+            const markAll = document.getElementById('mark-all-read');
+
+            if (!bell || !badge || !dropdown || !list || !markAll) return;
+
+            let isOpen = false;
+
+            const toggleDropdown = () => {
+                isOpen = !isOpen;
+                dropdown.style.display = isOpen ? 'flex' : 'none';
+                if (isOpen) fetchUnread();
+            };
+
+            bell.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleDropdown();
+            });
+
+            document.addEventListener('click', (e) => {
+                if (isOpen && !dropdown.contains(e.target)) {
+                    isOpen = false;
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+            const fetchUnread = async () => {
+                try {
+                    const res = await fetch(endpointUrl('/api/alerts/events/unread'));
+                    if (res.ok) {
+                        const data = unwrap(await res.json());
+                        const count = data.length;
+                        if (count > 0) {
+                            badge.textContent = count > 99 ? '99+' : count;
+                            badge.style.display = 'inline-block';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                        
+                        if (isOpen) {
+                            if (count === 0) {
+                                list.innerHTML = '<div class="notification-item"><p style="text-align:center; color:#9ca3af;">No unread alerts</p></div>';
+                            } else {
+                                list.innerHTML = data.map(item => `
+                                    <div class="notification-item unread">
+                                        <p>${escapeHtml(item.message)}</p>
+                                        <span class="time">${new Date(item.triggeredDttm).toLocaleString()}</span>
+                                        <button class="mark-read" data-id="${item.id}">Mark as read</button>
+                                    </div>
+                                `).join('');
+                                
+                                list.querySelectorAll('.mark-read').forEach(btn => {
+                                    btn.addEventListener('click', async (e) => {
+                                        const id = e.target.dataset.id;
+                                        try {
+                                            await fetch(endpointUrl('/api/alerts/events/' + id + '/read'), { method: 'PUT' });
+                                            fetchUnread(); // Refresh list
+                                        } catch {}
+                                    });
+                                });
+                            }
+                        }
+                    }
+                } catch {}
+            };
+
+            markAll.addEventListener('click', async () => {
+                try {
+                    await fetch(endpointUrl('/api/alerts/events/read-all'), { method: 'PUT' });
+                    fetchUnread();
+                    isOpen = false;
+                    dropdown.style.display = 'none';
+                } catch {}
+            });
+
+            // Poll every 10 seconds
+            setInterval(fetchUnread, 10000);
+            fetchUnread();
+        };
+
+        initNotifications();
 
         const forms = Array.from(document.querySelectorAll('.sdui-form'));
         Promise.all(forms.map(form => renderForm(form).catch(error => form.textContent = error.message)))

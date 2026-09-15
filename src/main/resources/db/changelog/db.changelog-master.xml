@@ -62,5 +62,14 @@
     <changeSet id="18-system-logs-sdui" author="service-pulse" dbms="mysql">
         <sqlFile path="sql/V18__system_logs_sdui.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
     </changeSet>
+    <changeSet id="19-update-alert-form-dropdowns" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V19__update_alert_form_dropdowns.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+    <changeSet id="20-add-alert-toggle-action" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V20__add_alert_toggle_action.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
+    <changeSet id="21-add-is-read-to-alert-events" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V21__add_is_read_to_alert_events.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    </changeSet>
 </databaseChangeLog>
 

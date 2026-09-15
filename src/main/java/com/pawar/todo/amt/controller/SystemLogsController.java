@@ -6,7 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,45 +81,69 @@ public class SystemLogsController {
     // ── GET /api/system/logs/stream ───────────────────────────────────────────
 
     /**
-     * SSE stream: polls the in-memory buffer every 1 second and pushes new
-     * entries since the last poll.
+     * SSE live stream of new log entries.
+     *
+     * Uses {@link SystemLogAppender#totalAppended()} — a monotonically
+     * increasing counter — to detect new entries.  This works correctly even
+     * after the ring buffer wraps around (i.e. when bufferSize() stays
+     * constant at CAPACITY and a pure size-comparison would never fire).
      */
     @CrossOrigin(origins = "*", allowedHeaders = "*")
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamLogs() {
-        SseEmitter emitter = new SseEmitter(0L); // no timeout
-        AtomicInteger lastSize = new AtomicInteger(SystemLogAppender.bufferSize());
+        SseEmitter emitter = new SseEmitter(0L); // no server-side timeout
+        AtomicBoolean stopped = new AtomicBoolean(false);
+
+        // Record the total number of entries at stream-open time.
+        // New entries are defined as those appended after this moment.
+        AtomicLong lastSeq = new AtomicLong(SystemLogAppender.totalAppended());
+
+        emitter.onCompletion(() -> stopped.set(true));
+        emitter.onTimeout(() -> stopped.set(true));
+        emitter.onError(e -> stopped.set(true));
 
         try {
             logStreamExecutor.execute(() -> {
                 try {
-                    while (true) {
-                        try { Thread.sleep(1000); } catch (InterruptedException ie) {
+                    while (!stopped.get()) {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
-                            break;
+                            return;
                         }
 
-                        int currentSize = SystemLogAppender.bufferSize();
-                        if (currentSize != lastSize.get()) {
-                            List<LogEntry> newEntries = SystemLogAppender.getSince(lastSize.get());
-                            lastSize.set(currentSize);
+                        long currentSeq = SystemLogAppender.totalAppended();
+                        long delta = currentSeq - lastSeq.get();
+
+                        if (delta > 0) {
+                            // Fetch only the newly-arrived entries (up to delta, capped at 200)
+                            int count = (int) Math.min(delta, 200);
+                            List<LogEntry> newEntries = SystemLogAppender.getLast(count);
+                            lastSeq.set(currentSeq);
+
                             for (LogEntry entry : newEntries) {
+                                if (stopped.get()) return;
                                 try {
                                     emitter.send(SseEmitter.event()
                                             .name("log")
                                             .data(entry));
                                 } catch (IOException ioEx) {
+                                    stopped.set(true);
                                     return; // client disconnected
                                 }
                             }
                         }
                     }
                 } catch (Exception ex) {
-                    emitter.completeWithError(ex);
+                    if (!stopped.get()) {
+                        emitter.completeWithError(ex);
+                    }
                 }
             });
         } catch (RejectedExecutionException ex) {
-            emitter.completeWithError(new IllegalStateException("Too many active log streams", ex));
+            emitter.completeWithError(
+                    new IllegalStateException("Too many active log streams", ex));
         }
 
         return emitter;
@@ -148,43 +173,48 @@ public class SystemLogsController {
      * Changes the log level of a specific package at runtime.
      *
      * Request body: { "logger": "com.pawar.todo.amt", "level": "DEBUG" }
+     *
+     * Using {@code Map<String, String>} for the request body avoids any
+     * Jackson record-deserialization edge-cases with older Jackson versions.
      */
     @CrossOrigin(origins = "*", allowedHeaders = "*")
     @PutMapping("/level")
-    public ResponseEntity<ApiResponse<Map<String, String>>> setLevel(
-            @RequestBody LogLevelRequest request) {
+    public ResponseEntity<ApiResponse<String>> setLevel(
+            @RequestBody Map<String, String> body) {
 
-        if (request == null || request.logger() == null || request.level() == null) {
+        String loggerName = body == null ? null : body.get("logger");
+        String levelStr   = body == null ? null : body.get("level");
+
+        if (loggerName == null || loggerName.isBlank() || levelStr == null || levelStr.isBlank()) {
             return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "logger and level are required", null));
+                    .body(new ApiResponse<>(false, "Both 'logger' and 'level' fields are required", null));
         }
 
-        // Only allow changes to managed loggers for safety
-        String loggerName = request.logger().trim();
-        boolean managed = MANAGED_LOGGERS.stream().anyMatch(loggerName::startsWith);
+        loggerName = loggerName.trim();
+        levelStr   = levelStr.trim().toUpperCase();
+
+        // Safety: only allow changes to known managed packages
+        final String finalLoggerName = loggerName;
+        boolean managed = MANAGED_LOGGERS.stream().anyMatch(finalLoggerName::startsWith);
         if (!managed) {
             return ResponseEntity.badRequest()
                     .body(new ApiResponse<>(false,
                             "Logger '" + loggerName + "' is not in the managed list", null));
         }
 
-        Level newLevel = Level.toLevel(request.level().trim().toUpperCase(), null);
+        Level newLevel = Level.toLevel(levelStr, null);
         if (newLevel == null) {
             return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Invalid level: " + request.level(), null));
+                    .body(new ApiResponse<>(false, "Invalid level: " + levelStr
+                            + ". Valid values: TRACE, DEBUG, INFO, WARN, ERROR, OFF", null));
         }
 
         LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
         ch.qos.logback.classic.Logger logger = context.getLogger(loggerName);
         logger.setLevel(newLevel);
 
-        log.info("Log level changed: logger='{}' level='{}'", loggerName, newLevel);
-
-        return ResponseEntity.ok(new ApiResponse<>(true,
-                "Log level for '" + loggerName + "' set to " + newLevel, null));
+        String message = "Log level for '" + loggerName + "' set to " + newLevel;
+        log.info(message);
+        return ResponseEntity.ok(new ApiResponse<>(true, message, null));
     }
-
-    // ── Inner record for request body ─────────────────────────────────────────
-
-    public record LogLevelRequest(String logger, String level) {}
 }
