@@ -34,6 +34,9 @@ public class AlertEvent {
     @Column(name = "status", nullable = false)
     private String status;
 
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead = false;
+
     @Column(name = "triggered_dttm", nullable = false)
     private LocalDateTime triggeredDttm;
 }
