@@ -182,7 +182,8 @@ public class SystemLogsController {
     public ResponseEntity<ApiResponse<String>> setLevel(
             @RequestBody Map<String, String> body) {
 
-        String loggerName = body == null ? null : body.get("logger");
+        try{
+            String loggerName = body == null ? null : body.get("logger");
         String levelStr   = body == null ? null : body.get("level");
 
         if (loggerName == null || loggerName.isBlank() || levelStr == null || levelStr.isBlank()) {
@@ -216,5 +217,11 @@ public class SystemLogsController {
         String message = "Log level for '" + loggerName + "' set to " + newLevel;
         log.info(message);
         return ResponseEntity.ok(new ApiResponse<>(true, message, null));
+        }
+
+        catch(Exception e){
+            return ResponseEntity.badRequest()
+                    .body(new ApiResponse<>(false, "Invalid level: " + e.getMessage(), null));
+        }
     }
 }
