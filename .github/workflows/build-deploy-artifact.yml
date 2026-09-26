@@ -32,8 +32,8 @@ jobs:
     with:
       USERNAME: ${{ github.actor }}
       # FIX: Use GitHub's built-in variables instead of custom secrets
-      REPO_NAME: ${{ github.event.repository.name }}
-      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+      REPO_URL: ${{ vars.REPO_URL }}
+      REPO_NAME: ${{ vars.REPO_NAME }}
     # 2. 'secrets' is used ONLY for secure tokens
     secrets:
       PASSWORD: ${{ secrets.GITHUB_TOKEN }}
