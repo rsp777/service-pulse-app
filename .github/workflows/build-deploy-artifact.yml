@@ -24,7 +24,7 @@ jobs:
   docker-build-push:
     needs: build-and-deploy
     # Point this to your central hub repository
-    uses: rsp777/deployment-workflows/.github/workflows/docker-build-push.yml@main
+    uses: rsp777/deployment-workflows/.github/workflows/docker-build-deploy.yml@main
     permissions:
       contents: write # Allow pushing commits/tags
       packages: write # Allow publishing packages
