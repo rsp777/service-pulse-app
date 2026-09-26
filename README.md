@@ -97,7 +97,7 @@ The scheduler interval is read when the application starts. Service health URLs 
 
 This flag `backfill-data.populate.enabled` decides whether to populate the data or not during service startup
 
-For deployments using `spring.jpa.hibernate.ddl-auto=none`, run the idempotent migrations at [db/mysql/V2__server_service_configuration.sql](db/mysql/V2__server_service_configuration.sql) and [db/mysql/V3__alert_managemenzt.sql](db/mysql/V3__alert_management.sql) before starting the application. `V2` creates the server-specific configuration tables, migrates existing service URLs, seeds the runtime flags, and removes the legacy `service.healthCheckUrl` column. `V3` creates the alert configuration and alert event tables and seeds the alert-management runtime flag.
+For deployments using `spring.jpa.hibernate.ddl-auto=none`, run the idempotent consolidated migration at [src/main/resources/db/changelog/sql/V1__init.sql](src/main/resources/db/changelog/sql/V1__init.sql) or rely on the application's automated Liquibase startup migrations. This consolidated script creates all required tables (services, alerts, configurations, and SDUI screens) and seeds initial administrative runtime flags.
 
 Set `JPA_DDL_AUTO=none` when deploying with this script. Set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` to the same database used to run the migration. For SSH execution, set `SSH_USERNAME`, `SSH_PRIVATE_KEY_PATH`, and `SSH_KNOWN_HOSTS_PATH`; the application requires a known-hosts file when strict host-key checking is enabled.
 

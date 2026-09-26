@@ -4,72 +4,8 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
 
-    <changeSet id="2-server-service-configuration" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V2__server_service_configuration.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
+    <changeSet id="1-init" author="service-pulse" dbms="mysql">
+        <sqlFile path="sql/V1__init.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
     </changeSet>
 
-    <changeSet id="3-alert-management" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V3__alert_management.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="4-ui-actions" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V4__screen_definitions.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="5-ui-action-components" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V5__ui_action_components.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="6-seed-service-pulse-sdui" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V6__seed_service_pulse_sdui.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="7-sdui-crud-screens" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V7__sdui_crud_screens.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="8-sdui-crud-api" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V8__sdui_crud_api.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="9-alert-condition-management" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V9__alert_condition_management.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="10-add-service-type" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V10__add_service_type.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="11-add-row-actions-to-services" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V11__add_row_actions_to_services.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-
-    <changeSet id="12-add-status-version-columns" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V12__add_status_version_columns.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-    <changeSet id="14-update-services-sdui" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V14__update_services_sdui.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-    <changeSet id="15-fix-services-table-and-modal" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V15__fix_services_table_and_modal.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-    <changeSet id="16-update-service-modal-fields" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V16__update_service_modal_fields.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-    <changeSet id="17-enable-modal-for-all-forms" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V17__enable_modal_for_all_forms.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-    <changeSet id="18-system-logs-sdui" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V18__system_logs_sdui.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-    <changeSet id="19-update-alert-form-dropdowns" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V19__update_alert_form_dropdowns.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-    <changeSet id="20-add-alert-toggle-action" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V20__add_alert_toggle_action.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
-    <changeSet id="21-add-is-read-to-alert-events" author="service-pulse" dbms="mysql">
-        <sqlFile path="sql/V21__add_is_read_to_alert_events.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
-    </changeSet>
 </databaseChangeLog>
-

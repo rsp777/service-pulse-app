@@ -7,8 +7,7 @@ COPY . .
 # Ensure mvnw has execute permissions and Unix line endings
 RUN sed -i 's/\r$//' mvnw && chmod +x mvnw
 # Compile native image (mounts Maven settings for authenticated repositories like GitHub Packages if provided)
-RUN --mount=type=secret,id=m2settings,target=/root/.m2/settings.xml \
-    ./mvnw clean -Pnative native:compile -DskipTests
+RUN mvn clean install
 
 # Stage 2: Create a lightweight runtime image
 FROM ubuntu:noble
