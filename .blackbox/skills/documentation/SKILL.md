@@ -3,7 +3,6 @@ name: documentation
 description: Generates, formats, and maintains high-quality technical documentation for codebases, APIs, and projects. Use this skill when instructed to write READMEs, API specifications, docstrings, or user guides.
 ---
 
-
 # Documentation
 
 ## Instructions
