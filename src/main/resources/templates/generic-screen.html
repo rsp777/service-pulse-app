@@ -269,7 +269,7 @@
                     <section th:each="panel : ${category.value}"><h3 th:text="${panel.key}">Panel</h3>
                         <div class="actions">
                             <div th:each="action : ${panel.value}" th:classappend="${action.gridSpan}">
-                                <button th:if="${action.componentType == 'ACTION'}" class="action" th:attr="data-endpoint=${action.actionEndpoint},data-payload=${action.requestPayload}" th:text="${action.iconClass == null ? action.actionLabel : action.iconClass + ' ' + action.actionLabel}">Action</button>
+                                <button th:if="${action.componentType == 'ACTION'}" class="action" th:classappend="${action.iconClass != null ? ' ' + action.iconClass : ''}" th:attr="data-endpoint=${action.actionEndpoint},data-payload=${action.requestPayload}" th:text="${action.actionLabel}">Action</button>
                                 <section th:if="${action.componentType == 'TABLE'}" class="sdui-table" th:attr="data-config=${action.componentConfig}"><h4 th:text="${action.actionLabel}">Table</h4><div>Loading...</div></section>
                                 <form th:if="${action.componentType == 'FORM'}" class="sdui-form" th:attr="data-config=${action.componentConfig}"><h4 th:text="${action.actionLabel}">Form</h4></form>
                                 <p th:if="${action.componentType == 'NOTICE'}" class="sdui-notice" th:text="${action.componentConfig}">Notice</p>
@@ -616,6 +616,10 @@
             });
 
             if (config.modal) {
+                // Hide the form's inner heading if it's placed inside a modal
+                const formHeader = form.querySelector('h4');
+                if (formHeader) formHeader.style.display = 'none';
+
                 // 1. Replace the form in the DOM with just the trigger button
                 const triggerBtn = document.createElement('button');
                 triggerBtn.type = 'button';
@@ -927,4 +931,4 @@
         Array.from(document.querySelectorAll('.sdui-logs')).forEach(c => renderLogs(c).catch(err => { const o = c.querySelector('.logs-output'); if (o) o.textContent = err.message; }));
     </script>
 </body>
-</html>
+</html>
