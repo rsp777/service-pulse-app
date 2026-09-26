@@ -31,9 +31,10 @@ jobs:
     # 1. 'with' is used for public strings and GitHub context variables
     with:
       USERNAME: ${{ github.actor }}
-
+      # FIX: Use GitHub's built-in variables instead of custom secrets
+      REPO_NAME: ${{ github.event.repository.name }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
     # 2. 'secrets' is used ONLY for secure tokens
     secrets:
       PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-      REPO_URL: ${{ secrets.REPO_URL }}
-      REPO_NAME: ${{ secrets.REPO_NAME }}
+     
