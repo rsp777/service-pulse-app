@@ -22,7 +22,7 @@ jobs:
       REPO_NAME: ${{ secrets.REPO_NAME }}
       
   docker-build-push:
-    #needs: build-and-deploy
+    needs: build-and-deploy
     # Point this to your central hub repository
     uses: rsp777/deployment-workflows/.github/workflows/docker-build-deploy.yml@main
     permissions:
