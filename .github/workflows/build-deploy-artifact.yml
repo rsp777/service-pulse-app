@@ -2,21 +2,82 @@ name: Microservice Build Pipeline
 
 on:
   push:
-    branches: [ "master" ]
-    
+    branches: ["master"]
+
 jobs:
   build-and-deploy:
     # Point this to your central hub repository
     uses: rsp777/deployment-workflows/.github/workflows/maven-build.yml@main
     permissions:
-      contents: write        # Allow pushing commits/tags
-      packages: write        # Allow publishing packages
+      contents: write # Allow pushing commits/tags
+      packages: write # Allow publishing packages
     # 1. 'with' is used for public strings and GitHub context variables
     with:
       USERNAME: ${{ github.actor }}
-      
+
     # 2. 'secrets' is used ONLY for secure tokens
     secrets:
       PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       REPO_URL: ${{ secrets.REPO_URL }}
       REPO_NAME: ${{ secrets.REPO_NAME }}
+
+  docker-build-push:
+    needs: build-and-deploy
+    # Point this to your central hub repository
+    uses: rsp777/deployment-workflows/.github/workflows/docker-build-deploy.yml@main
+    permissions:
+      contents: write # Allow pushing commits/tags
+      packages: write # Allow publishing packages
+    # 1. 'with' is used for public strings and GitHub context variables
+    with:
+      USERNAME: ${{ github.actor }}
+      # FIX: Use GitHub's built-in variables instead of custom secrets
+      REPO_URL: ${{ vars.REPO_URL }}
+      REPO_NAME: ${{ vars.REPO_NAME }}
+    # 2. 'secrets' is used ONLY for secure tokens
+    secrets:
+      PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Sync k8s manifests to the VM, then deploy to dev ────────────────────────
+  # Manifests live in a dedicated PUBLIC repo: rsp777/service-pulse-k8s
+  # No PAT needed — GITHUB_TOKEN can read any public repo.
+  sync-manifests:
+    name: Sync k8s manifests to VM
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout k8s manifests repo
+        uses: actions/checkout@v4
+        with:
+          repository: rsp777/service-pulse-k8s   # public repo — no extra token needed
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: k8s-manifests                     # checked out into this sub-folder
+
+      - name: Copy k8s manifests to VM via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.K8S_SSH_HOST }}
+          username: ${{ secrets.K8S_SSH_USER }}
+          key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.K8S_SSH_PORT || '22' }}
+          source: "k8s-manifests/"               # source is the checked-out folder
+          target: "$HOME/.deploy/service-pulse-app/"
+          overwrite: true
+
+  deploy-dev:
+    name: Deploy to Dev
+    needs: sync-manifests
+    uses: ./.github/workflows/k8s-deploy.yml
+    permissions:
+      contents: read
+    with:
+      environment: dev
+      # Build the full image reference: ghcr.io/<owner>/<repo>:latest
+      # (the docker-build-push job always tags :latest on master)
+      image_tag: ghcr.io/${{ github.repository_owner }}/${{ vars.REPO_NAME }}:latest
+      k8s_repo: rsp777/service-pulse-k8s         # passed so manual dispatch can also fetch
+    secrets:
+      K8S_SSH_HOST: ${{ secrets.K8S_SSH_HOST }}
+      K8S_SSH_USER: ${{ secrets.K8S_SSH_USER }}
+      K8S_SSH_PRIVATE_KEY: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
+      K8S_SSH_PORT: ${{ secrets.K8S_SSH_PORT }}

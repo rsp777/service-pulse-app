@@ -1,0 +1,178 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Reusable workflow: Deploy service-pulse-app to Kubernetes
+#
+# Strategy:
+#   GitHub-hosted runners have no direct network access to the on-prem VM.
+#   We SSH into the VM (user: ravi) using a dedicated deploy key stored as a
+#   GitHub secret, then run kubectl on the VM itself — which already has
+#   kubeconfig configured for the local cluster.
+#
+#   K8s manifests live in a SEPARATE public repo (rsp777/service-pulse-k8s).
+#   No PAT is required — public repo checkout uses GITHUB_TOKEN automatically.
+#   The sync-manifests job copies them to the VM before this workflow runs.
+#   For manual workflow_dispatch runs, this workflow re-fetches and SCPs them.
+#
+# Required GitHub Secrets:
+#   K8S_SSH_HOST         – IP / hostname of the Ubuntu VM  (e.g. 192.168.1.50)
+#   K8S_SSH_USER         – SSH login user                  (ravi)
+#   K8S_SSH_PRIVATE_KEY  – ED25519 private key
+#
+# Optional:
+#   K8S_SSH_PORT         – SSH port (default 22)
+# ──────────────────────────────────────────────────────────────────────────────
+name: Deploy to Kubernetes
+
+on:
+  workflow_call:
+    inputs:
+      # Target environment: dev | qa | prod
+      environment:
+        required: true
+        type: string
+      # Full image tag to deploy  e.g. ghcr.io/rsp777/service-pulse-app:1.2.3
+      image_tag:
+        required: true
+        type: string
+      # Kubernetes namespace that matches the environment
+      namespace:
+        required: false
+        type: string
+        default: ""   # derived from environment when empty
+      # The separate GitHub repo holding k8s manifests  e.g. rsp777/service-pulse-k8s
+      k8s_repo:
+        required: true
+        type: string
+
+    secrets:
+      K8S_SSH_HOST:
+        required: true
+      K8S_SSH_USER:
+        required: true
+      K8S_SSH_PRIVATE_KEY:
+        required: true
+      K8S_SSH_PORT:
+        required: false
+        # No K8S_REPO_PAT needed — service-pulse-k8s is a public repo
+
+  # Allow manual one-off deploys from the Actions UI
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (dev / qa / prod)"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, qa, prod]
+      image_tag:
+        description: "Full image tag to deploy (e.g. ghcr.io/rsp777/service-pulse-app:0.0.4)"
+        required: true
+        type: string
+      k8s_repo:
+        description: "K8s manifests repo (owner/repo)"
+        required: true
+        default: rsp777/service-pulse-k8s
+        type: string
+
+jobs:
+  deploy:
+    name: "Deploy → ${{ inputs.environment }}"
+    runs-on: ubuntu-latest
+
+    # Protect production deployments with a GitHub Environment (optional but
+    # recommended – set up "prod" env with required reviewers in repo settings)
+    environment: ${{ inputs.environment }}
+
+    steps:
+      # ── 1. Derive namespace from environment ────────────────────────────────
+      - name: Resolve namespace
+        id: ns
+        run: |
+          INPUT_NS="${{ inputs.namespace }}"
+          if [ -n "$INPUT_NS" ]; then
+            echo "namespace=$INPUT_NS" >> "$GITHUB_OUTPUT"
+          else
+            echo "namespace=service-pulse-${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 2. Checkout k8s manifests from the dedicated manifests repo ──────────
+      #   Public repo — no token required. GITHUB_TOKEN is used implicitly.
+      - name: Checkout k8s manifests repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.k8s_repo }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: k8s-manifests
+
+      # ── 2b. (manual dispatch only) SCP manifests to VM ──────────────────────
+      #   When triggered manually, sync-manifests hasn't run, so we push them now.
+      - name: Sync manifests to VM (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.K8S_SSH_HOST }}
+          username: ${{ secrets.K8S_SSH_USER }}
+          key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.K8S_SSH_PORT || '22' }}
+          source: "k8s-manifests/"
+          target: "$HOME/.deploy/service-pulse-app/"
+          overwrite: true
+
+      # ── 3. SSH into the VM and deploy ───────────────────────────────────────
+      #   We use appleboy/ssh-action which handles all SSH plumbing.
+      #   The script block runs entirely on the remote VM.
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.K8S_SSH_HOST }}
+          username: ${{ secrets.K8S_SSH_USER }}
+          key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.K8S_SSH_PORT || '22' }}
+          # Copy the k8s directory to the VM first, then apply
+          script_stop: true   # Abort SSH session on first error
+          script: |
+            set -euo pipefail
+            NAMESPACE="${{ steps.ns.outputs.namespace }}"
+            IMAGE_TAG="${{ inputs.image_tag }}"
+            ENV="${{ inputs.environment }}"
+            K8S_DIR="$HOME/.deploy/service-pulse-app/k8s"
+
+            echo "▶ Environment : $ENV"
+            echo "▶ Namespace   : $NAMESPACE"
+            echo "▶ Image       : $IMAGE_TAG"
+
+            # ── Ensure namespace exists ────────────────────────────────────────
+            kubectl get namespace "$NAMESPACE" 2>/dev/null \
+              || kubectl create namespace "$NAMESPACE" \
+              || kubectl apply -f "$K8S_DIR/namespace-${ENV}.yaml"
+
+            # ── Apply ConfigMap & base manifests ──────────────────────────────
+            kubectl apply -f "$K8S_DIR/configmap.yaml"     -n "$NAMESPACE"
+            kubectl apply -f "$K8S_DIR/secret.yaml"        -n "$NAMESPACE" || true  # skip if managed externally
+            kubectl apply -f "$K8S_DIR/mysql-pvc.yaml"     -n "$NAMESPACE"
+            kubectl apply -f "$K8S_DIR/mysql-deployment.yaml" -n "$NAMESPACE"
+
+            # ── Patch image in the Deployment manifest and apply ──────────────
+            # We use kubectl set image for a clean, atomic image update without
+            # modifying the file on disk.
+            kubectl apply -f "$K8S_DIR/app-deployment.yaml" -n "$NAMESPACE"
+            kubectl set image deployment/service-pulse-app \
+              service-pulse-app="$IMAGE_TAG" \
+              -n "$NAMESPACE"
+
+            # ── Wait for rollout to complete ──────────────────────────────────
+            echo "⏳ Waiting for rollout to complete (timeout 5m)..."
+            kubectl rollout status deployment/service-pulse-app \
+              -n "$NAMESPACE" --timeout=300s
+
+            # ── Print final pod status ────────────────────────────────────────
+            echo ""
+            echo "✅ Deployment complete!"
+            kubectl get pods -n "$NAMESPACE" -l app=service-pulse-app
+
+      # ── 4. Upload manifests as artefact for audit trail ─────────────────────
+      - name: Archive deployed manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-manifests-${{ inputs.environment }}-${{ github.run_number }}
+          path: k8s-manifests/    # checked-out copy of the separate manifests repo
+          retention-days: 30
