@@ -111,4 +111,12 @@
         </addColumn>
     </changeSet>
 
+    <changeSet id="8" author="full-stack-developer">
+        <dropForeignKeyConstraint baseTableName="metrics" constraintName="fk_service_id"/>
+        <addForeignKeyConstraint baseTableName="metrics" baseColumnNames="service_id" constraintName="fk_service_id" referencedTableName="services" referencedColumnNames="id" onDelete="CASCADE"/>
+        
+        <dropForeignKeyConstraint baseTableName="services" constraintName="fk_server_id"/>
+        <addForeignKeyConstraint baseTableName="services" baseColumnNames="server_id" constraintName="fk_server_id" referencedTableName="servers" referencedColumnNames="id" onDelete="CASCADE"/>
+    </changeSet>
+
 </databaseChangeLog>

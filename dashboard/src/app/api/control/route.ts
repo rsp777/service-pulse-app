@@ -10,8 +10,8 @@ export async function POST(
       return NextResponse.json({ error: 'Missing serviceId or action' }, { status: 400 });
     }
 
-    // Forward the request to the Java Collector
-    const response = await fetch(`http://service-collector:8080/control/execute/${serviceId}/${action}`, {
+    const collectorUrl = process.env.COLLECTOR_URL || 'http://service-collector:8080';
+    const response = await fetch(`${collectorUrl}/control/execute/${serviceId}/${action}`, {
       method: 'POST',
     });
 

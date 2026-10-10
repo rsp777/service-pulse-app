@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     networks:
       - monitor-net
 
@@ -57,6 +57,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: ravi
       DB_NAME: postgres
+      COLLECTOR_URL: http://service-collector:8080
     networks:
       - monitor-net
 
