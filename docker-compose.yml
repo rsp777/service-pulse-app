@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  monitor-db:
+    image: postgres:latest
+    container_name: monitor-db
+    environment:
+      POSTGRES_PASSWORD: ravi
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monitor-net
+
+  db-migrate:
+    image: liquibase/liquibase:4.25
+    container_name: db-migrate
+    volumes:
+      - ./db/changelog:/liquibase/changelog
+      - ./liquibase.properties:/liquibase/liquibase.properties
+    command: update --changelog-file=db.changelog-master.xml --url=jdbc:postgresql://monitor-db:5432/postgres --username=postgres --password=ravi
+    depends_on:
+      - monitor-db
+    networks:
+      - monitor-net
+
+  collector:
+    build: ./collector
+    container_name: service-collector
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      monitor-db:
+        condition: service_started
+    environment:
+      datasource.url: jdbc:postgresql://monitor-db:5432/postgres
+      datasource.username: postgres
+      datasource.password: ravi
+      poller.interval: 60s
+    networks:
+      - monitor-net
+
+  dashboard:
+    build: ./dashboard
+    container_name: service-dashboard
+    ports:
+      - "3000:3000"
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      monitor-db:
+        condition: service_started
+    environment:
+      DB_HOST: monitor-db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ravi
+      DB_NAME: postgres
+    networks:
+      - monitor-net
+
+networks:
+  monitor-net:
+    driver: bridge
+
+volumes:
+  postgres_data:

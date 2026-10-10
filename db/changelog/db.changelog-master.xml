@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.0.xsd">
+
+    <changeSet id="1" author="full-stack-developer">
+        <createTable tableName="services">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="url" type="VARCHAR(255)"/>
+            <column name="type" type="VARCHAR(50)"/>
+            <column name="status" type="VARCHAR(20)" defaultValue="unknown"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="full-stack-developer">
+        <createTable tableName="metrics">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="service_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="value" type="DOUBLE"/>
+            <column name="metric_type" type="VARCHAR(50)"/>
+            <column name="timestamp" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="metrics" baseColumnNames="service_id" constraintName="fk_service_id" referencedTableName="services" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="3" author="full-stack-developer">
+        <insert tableName="services">
+            <column name="name" value="Google"/>
+            <column name="url" value="https://google.com"/>
+            <column name="type" value="http"/>
+        </insert>
+        <insert tableName="services">
+            <column name="name" value="GitHub"/>
+            <column name="url" value="https://github.com"/>
+            <column name="type" value="http"/>
+        </insert>
+        <insert tableName="services">
+            <column name="name" value="Local DB"/>
+            <column name="url" value="localhost:5432"/>
+            <column name="type" value="tcp"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
