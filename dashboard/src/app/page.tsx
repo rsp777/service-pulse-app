@@ -68,7 +68,9 @@ export default function Dashboard() {
             return (
               <div key={service.id} className="p-6 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-all group">
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-lg font-semibold group-hover:text-white transition-colors">{service.name}</h3>
+                  <h3 className="text-lg font-semibold group-hover:text-white transition-colors cursor-pointer" onClick={() => {
+                    window.location.href = `/server/1`;
+                  }}>{service.name}</h3>
                   <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${isUp ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}`}>
                     {service.last_status}
                   </span>

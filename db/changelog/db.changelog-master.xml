@@ -52,4 +52,63 @@
         </insert>
     </changeSet>
 
+    <changeSet id="4" author="full-stack-developer">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="servers"/>
+            </not>
+        </preConditions>
+        <createTable tableName="servers">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="hostname" type="VARCHAR(255)"/>
+            <column name="ip" type="VARCHAR(50)"/>
+            <column name="os_type" type="VARCHAR(50)"/>
+            <column name="ssh_user" type="VARCHAR(100)"/>
+            <column name="ssh_key_path" type="VARCHAR(500)"/>
+            <column name="status" type="VARCHAR(20)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="5" author="full-stack-developer">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="services" columnName="server_id"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="services">
+            <column name="server_id" type="INT"/>
+        </addColumn>
+        <addForeignKeyConstraint baseTableName="services" baseColumnNames="server_id" constraintName="fk_server_id" referencedTableName="servers" referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="6" author="full-stack-developer">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="system_config"/>
+            </not>
+        </preConditions>
+        <createTable tableName="system_config">
+            <column name="config_key" type="VARCHAR(100)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="config_value" type="VARCHAR(500)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="7" author="full-stack-developer">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="services" columnName="start_script"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="services">
+            <column name="start_script" type="VARCHAR(500)"/>
+            <column name="stop_script" type="VARCHAR(500)"/>
+            <column name="restart_script" type="VARCHAR(500)"/>
+            <column name="logs_path" type="VARCHAR(500)"/>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

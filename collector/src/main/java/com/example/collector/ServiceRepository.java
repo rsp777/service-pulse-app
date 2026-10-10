@@ -1,5 +1,6 @@
 package com.example.collector;
 
+import com.example.collector.model.ServiceEntity;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
@@ -7,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Singleton
 public class ServiceRepository {
@@ -21,7 +23,7 @@ public class ServiceRepository {
 
     public List<ServiceEntity> findAllServices() {
         List<ServiceEntity> services = new ArrayList<>();
-        String sql = "SELECT id, name, url, type FROM services";
+        String sql = "SELECT s.id, s.name, s.url, s.type, sv.ip, sv.ssh_user, sv.ssh_key_path FROM services s JOIN servers sv ON s.server_id = sv.id";
         
         try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass);
              Statement stmt = conn.createStatement();
@@ -32,13 +34,32 @@ public class ServiceRepository {
                     rs.getInt("id"),
                     rs.getString("name"),
                     rs.getString("url"),
-                    rs.getString("type")
+                    rs.getString("type"),
+                    rs.getString("ip"),
+                    rs.getString("ssh_user"),
+                    rs.getString("ssh_key_path")
                 ));
             }
         } catch (SQLException e) {
             LOG.error("Error fetching services from DB: {}", e.getMessage());
         }
         return services;
+    }
+
+    public Optional<String> getConfig(String key, String defaultValue) {
+        String sql = "SELECT config_value FROM system_config WHERE config_key = ?";
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass);
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, key);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(rs.getString("config_value"));
+                }
+            }
+        } catch (SQLException e) {
+            LOG.error("Error fetching config {}: {}", key, e.getMessage());
+        }
+        return Optional.ofNullable(defaultValue);
     }
 
     public void saveMetric(int serviceId, double value, String type) {
@@ -54,23 +75,4 @@ public class ServiceRepository {
             LOG.error("Error saving metric for service {}: {}", serviceId, e.getMessage());
         }
     }
-}
-
-class ServiceEntity {
-    private final int id;
-    private final String name;
-    private final String url;
-    private final String type;
-
-    public ServiceEntity(int id, String name, String url, String type) {
-        this.id = id;
-        this.name = name;
-        this.url = url;
-        this.type = type;
-    }
-
-    public int getId() { return id; }
-    public String getName() { return name; }
-    public String getUrl() { return url; }
-    public String getType() { return type; }
 }

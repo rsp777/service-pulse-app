@@ -1,59 +1,41 @@
 # Project Backlog: Agentless Service Monitor
 
-## Story 1: Project Structure & Config Management
-**Request**: Initialize the project directory structure for both Java (Collector) and TypeScript (Dashboard) and implement a centralized configuration system.
-**Implementation Plan**:
-- Create a monorepo structure: `/collector` (Java) and `/dashboard` (TypeScript).
-- Implement externalized configuration using `.env` files or properties files (for Java, using `application.properties` or environment variables).
-- Setup basic build files (Maven/Gradle for Java, `package.json` for TS).
-- **Verification**: Project builds without errors; config values are correctly loaded.
+## Phase 1: Core MVP (Completed)
+- Story 1: Project Structure & Config Management ✅
+- Story 2: Java Probe Engine - Core Infrastructure ✅
+- Story 3: Java Probe Engine - Network Probes (HTTP & TCP) ✅
+- Story 4: Java Probe Engine - SSH System Probe ✅
+- Story 5: Dashboard - API Layer ✅
+- Story 6: Dashboard - Real-time UI ✅
+- Story 7: Containerization & Deployment ✅
 
-## Story 2: Java Probe Engine - Core Infrastructure
-**Request**: Build the core scheduling and database connectivity layer for the Poller.
-**Implementation Plan**:
-- Setup PostgreSQL connection pool (HikariCP) to connect to the `monitor-db` on `ubuntu-dell`.
-- Implement a periodic scheduler (e.g., `ScheduledExecutorService`) to trigger probes.
-- Create a service to fetch the target list from the `services` table.
-- **Verification**: Scheduler runs at defined intervals; DB connectivity is established.
+## Phase 2: Dynamic Management & Server-Centric View (Completed)
+- Story 8: DB-Driven System Configuration ✅
+- Story 9: Server Health Metrics UI ✅
+- Story 10: Server Resource Consumption View ✅
+- Story 11: Remote Service Control (Start/Stop/Restart) ✅
 
-## Story 3: Java Probe Engine - Network Probes (HTTP & TCP)
-**Request**: Implement the logic to probe HTTP(S) endpoints and TCP ports.
-**Implementation Plan**:
-- Implement `HttpProbe`: Uses Java `HttpClient` to measure response time and status codes.
-- Implement `TcpProbe`: Uses `java.net.Socket` to check port accessibility.
-- Map probe results to the `metrics` table in PostgreSQL.
-- **Verification**: Google/GitHub (HTTP) and Postgres (TCP) statuses are correctly recorded in the DB.
+## Phase 3: Advanced Management & Observability (Current)
 
-## Story 4: Java Probe Engine - SSH System Probe
-**Request**: Implement an agentless system metrics gatherer via SSH.
-**Implementation Plan**:
-- Use a Java SSH library (e.g., JSch or Apache MINA SSHD).
-- Execute remote commands (`df`, `free`, `uptime`) on `ubuntu-dell`.
-- Parse output to extract CPU/RAM/Disk usage and store in `metrics`.
-- **Verification**: System metrics from `ubuntu-dell` are visible in the database.
+### Story 12: Advanced Service Lifecycle & Log Management
+**Request**: Enable full CRUD for servers and services, and allow custom script paths for control actions and log retrieval.
 
-## Story 5: Dashboard - API Layer
-**Request**: Create a backend API to serve monitoring data to the frontend.
 **Implementation Plan**:
-- Use Next.js API routes or a small Express server.
-- Create endpoints: `/api/services` (list all services) and `/api/metrics/:id` (get historical data for a service).
-- Implement efficient queries for the "last known status."
-- **Verification**: API returns correct JSON data from the PostgreSQL DB.
+- **Database**: 
+    - Update `services` table: add `start_script`, `stop_script`, `restart_script`, and `logs_path`.
+- **Backend (Collector)**:
+    - Refactor `ControlController` to execute the specific script path defined in the DB.
+    - Implement a `LogController` to fetch the last N lines of the `logs_path` via SSH.
+- **Backend (Dashboard API)**:
+    - Create `DELETE /api/server/[id]` and `DELETE /api/service/[id]`.
+    - Create `GET /api/service/[id]/logs`.
+    - Create `PATCH /api/service/[id]` to update script/log paths.
+- **Frontend (Dashboard UI)**:
+    - Add "Delete" actions to Server and Service views.
+    - Add a "View Logs" button to the service row that opens a terminal-style log viewer.
+    - Add a "Configure" modal for services to edit custom script paths.
 
-## Story 6: Dashboard - Real-time UI
-**Request**: Build a responsive dashboard to visualize the status of monitored services.
-**Implementation Plan**:
-- Use Tailwind CSS for a clean, professional look.
-- Implement a "Status Grid" showing current Up/Down state and latency.
-- Implement simple charts (e.g., using Chart.js or Recharts) for latency over time.
-- Add auto-refresh/polling to simulate real-time updates.
-- **Verification**: Dashboard correctly reflects the data being written by the Java poller.
-
-## Story 7: Containerization & Deployment
-**Request**: Prepare the application for deployment using Docker.
-**Implementation Plan**:
-- Create `Dockerfile` for the Java Collector (multi-stage build).
-- Create `Dockerfile` for the Next.js Dashboard.
-- Create a `docker-compose.yml` to orchestrate the Poller, Dashboard, and Database.
-- Ensure all configs are passed via environment variables.
-- **Verification**: `docker-compose up` launches the entire system successfully.
+**Verification**: 
+- Deleting a server removes it from the UI and DB.
+- Clicking "Restart" executes a custom shell script instead of a generic command.
+- "View Logs" retrieves real-time logs from the remote server's defined path.
