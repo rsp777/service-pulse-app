@@ -1,0 +1,24 @@
+name: Sync-Manifests
+jobs:
+  sync-manifests:
+    name: Sync k8s manifests to VM
+    needs: docker-build-push
+  runs-on: ubuntu-latest
+  steps:
+    - name: Checkout k8s manifests repo
+      uses: actions/checkout@v4
+      with:
+        repository: rsp777/service-pulse-k8s # public repo — no extra token needed
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: k8s-manifests # checked out into this sub-folder
+
+    - name: Copy k8s manifests to VM via SCP
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.K8S_SSH_HOST }}
+        username: ${{ secrets.K8S_SSH_USER }}
+        key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
+        port: ${{ secrets.K8S_SSH_PORT || '22' }}
+        source: "k8s-manifests/" # source is the checked-out folder
+        target: "$HOME/.deploy/service-pulse-app/"
+        overwrite: true

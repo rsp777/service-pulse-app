@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-pulse-app
+  namespace: service-pulse
+  labels:
+    app.kubernetes.io/name: service-pulse-app
+    app.kubernetes.io/part-of: service-pulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-pulse-app
+  template:
+    metadata:
+      labels:
+        app: service-pulse-app
+    spec:
+      # Pull image from GHCR (private registry)
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      initContainers:
+        # Wait for MySQL to be ready before starting the app
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z mysql-server 3306; do
+                echo "Waiting for MySQL..."
+                sleep 3
+              done
+      containers:
+        - name: service-pulse-app
+          image: ghcr.io/rsp777/service-pulse-app:latest
+          ports:
+            - containerPort: 9092
+          # Load all non-sensitive config from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: service-pulse-config
+          # Override sensitive values from Secret
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: service-pulse-secrets
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: service-pulse-secrets
+                  key: DB_PASSWORD
+            - name: SSH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: service-pulse-secrets
+                  key: SSH_USERNAME
+            - name: SSH_PRIVATE_KEY_PASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: service-pulse-secrets
+                  key: SSH_PRIVATE_KEY_PASSPHRASE
+          # Mount SSH keys
+          volumeMounts:
+            - name: ssh-keys
+              mountPath: /app/.ssh
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /service-pulse-app/actuator/health
+              port: 9092
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /service-pulse-app/actuator/health
+              port: 9092
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: ssh-keys
+          secret:
+            secretName: ssh-keys-secret
+            defaultMode: 0400
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-pulse-app
+  namespace: service-pulse
+  labels:
+    app.kubernetes.io/name: service-pulse-app
+spec:
+  selector:
+    app: service-pulse-app
+  ports:
+    - port: 9092
+      targetPort: 9092
+  type: ClusterIP

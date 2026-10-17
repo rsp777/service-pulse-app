@@ -3,42 +3,51 @@
 #
 # Strategy:
 #   GitHub-hosted runners have no direct network access to the on-prem VM.
-#   We SSH into the VM (user: ravi) using a dedicated deploy key stored as a
-#   GitHub secret, then run kubectl on the VM itself — which already has
+#   We SSH into the VM (ravi@ubuntu-dell) using a dedicated deploy key stored
+#   as a GitHub Secret, then run kubectl on the VM — which already has
 #   kubeconfig configured for the local cluster.
 #
 #   K8s manifests live in a SEPARATE public repo (rsp777/service-pulse-k8s).
 #   No PAT is required — public repo checkout uses GITHUB_TOKEN automatically.
-#   The sync-manifests job copies them to the VM before this workflow runs.
-#   For manual workflow_dispatch runs, this workflow re-fetches and SCPs them.
+#   The sync-manifests job (in build-deploy-artifact.yml) copies them to the VM
+#   before this workflow runs. For manual workflow_dispatch runs, this workflow
+#   re-fetches and SCPs them itself.
 #
 # Required GitHub Secrets:
-#   K8S_SSH_HOST         – IP / hostname of the Ubuntu VM  (e.g. 192.168.1.50)
-#   K8S_SSH_USER         – SSH login user                  (ravi)
+#   K8S_SSH_HOST         – hostname / IP of the VM   (ubuntu-dell)
+#   K8S_SSH_USER         – SSH login user             (ravi)
 #   K8S_SSH_PRIVATE_KEY  – ED25519 private key
 #
 # Optional:
-#   K8S_SSH_PORT         – SSH port (default 22)
+#   K8S_SSH_PORT         – SSH port (default: 22)
 # ──────────────────────────────────────────────────────────────────────────────
 name: Deploy to Kubernetes
 
+# ── Concurrency: only one deploy per environment at a time ───────────────────
+# If a newer run starts while one is in progress, the in-progress run is
+# cancelled so the latest code always wins.
+concurrency:
+  group: k8s-deploy-${{ inputs.environment || github.event.inputs.environment }}
+  cancel-in-progress: true
+
 on:
+  # ── Called from build-deploy-artifact.yml ───────────────────────────────────
   workflow_call:
     inputs:
       # Target environment: dev | qa | prod
       environment:
         required: true
         type: string
-      # Full image tag to deploy  e.g. ghcr.io/rsp777/service-pulse-app:1.2.3
+      # Full image tag  e.g. ghcr.io/rsp777/service-pulse-app:0.0.4
       image_tag:
         required: true
         type: string
-      # Kubernetes namespace that matches the environment
+      # Override namespace (defaults to service-pulse-<environment>)
       namespace:
         required: false
         type: string
-        default: ""   # derived from environment when empty
-      # The separate GitHub repo holding k8s manifests  e.g. rsp777/service-pulse-k8s
+        default: ""
+      # Dedicated public repo holding the k8s manifests
       k8s_repo:
         required: true
         type: string
@@ -51,20 +60,19 @@ on:
       K8S_SSH_PRIVATE_KEY:
         required: true
       K8S_SSH_PORT:
-        required: false
-        # No K8S_REPO_PAT needed — service-pulse-k8s is a public repo
+        required: false   # defaults to 22 inside the job
 
-  # Allow manual one-off deploys from the Actions UI
+  # ── Manual one-off deploy from the Actions UI ────────────────────────────────
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment (dev / qa / prod)"
+        description: "Target environment"
         required: true
         default: dev
         type: choice
         options: [dev, qa, prod]
       image_tag:
-        description: "Full image tag to deploy (e.g. ghcr.io/rsp777/service-pulse-app:0.0.4)"
+        description: "Full image tag  (e.g. ghcr.io/rsp777/service-pulse-app:0.0.4)"
         required: true
         type: string
       k8s_repo:
@@ -78,24 +86,30 @@ jobs:
     name: "Deploy → ${{ inputs.environment }}"
     runs-on: ubuntu-latest
 
-    # Protect production deployments with a GitHub Environment (optional but
-    # recommended – set up "prod" env with required reviewers in repo settings)
+    # GitHub Environment gives you protection rules & deployment history.
+    # Set up "prod" with required reviewers in repo Settings → Environments.
     environment: ${{ inputs.environment }}
 
+    # Make secrets/inputs available as clean env vars throughout the job
+    env:
+      SSH_HOST: ${{ secrets.K8S_SSH_HOST }}
+      SSH_USER: ${{ secrets.K8S_SSH_USER }}
+      SSH_PORT: ${{ secrets.K8S_SSH_PORT || '22' }}
+      ENV_NAME: ${{ inputs.environment }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      K8S_REPO:  ${{ inputs.k8s_repo }}
+
     steps:
-      # ── 1. Derive namespace from environment ────────────────────────────────
+      # ── 1. Resolve namespace ─────────────────────────────────────────────────
       - name: Resolve namespace
         id: ns
         run: |
           INPUT_NS="${{ inputs.namespace }}"
-          if [ -n "$INPUT_NS" ]; then
-            echo "namespace=$INPUT_NS" >> "$GITHUB_OUTPUT"
-          else
-            echo "namespace=service-pulse-${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
-          fi
+          NS="${INPUT_NS:-service-pulse-${{ inputs.environment }}}"
+          echo "namespace=$NS" >> "$GITHUB_OUTPUT"
+          echo "📌 Namespace: $NS"
 
-      # ── 2. Checkout k8s manifests from the dedicated manifests repo ──────────
-      #   Public repo — no token required. GITHUB_TOKEN is used implicitly.
+      # ── 2. Checkout k8s manifests (public repo — no extra token needed) ──────
       - name: Checkout k8s manifests repo
         uses: actions/checkout@v4
         with:
@@ -103,76 +117,143 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           path: k8s-manifests
 
-      # ── 2b. (manual dispatch only) SCP manifests to VM ──────────────────────
-      #   When triggered manually, sync-manifests hasn't run, so we push them now.
+      # ── 2b. SCP manifests to VM (manual dispatch only) ───────────────────────
+      #   In pipeline runs sync-manifests already pushed them; skip here.
       - name: Sync manifests to VM (manual dispatch)
         if: github.event_name == 'workflow_dispatch'
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.K8S_SSH_HOST }}
-          username: ${{ secrets.K8S_SSH_USER }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
           key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
-          port: ${{ secrets.K8S_SSH_PORT || '22' }}
+          port: ${{ env.SSH_PORT }}
           source: "k8s-manifests/"
           target: "$HOME/.deploy/service-pulse-app/"
           overwrite: true
+          # strip_components removes the "k8s-manifests" prefix so files land
+          # directly under $HOME/.deploy/service-pulse-app/
+          strip_components: 1
 
-      # ── 3. SSH into the VM and deploy ───────────────────────────────────────
-      #   We use appleboy/ssh-action which handles all SSH plumbing.
-      #   The script block runs entirely on the remote VM.
+      # ── 3. Deploy via SSH ────────────────────────────────────────────────────
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.K8S_SSH_HOST }}
-          username: ${{ secrets.K8S_SSH_USER }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
           key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
-          port: ${{ secrets.K8S_SSH_PORT || '22' }}
-          # Copy the k8s directory to the VM first, then apply
-          script_stop: true   # Abort SSH session on first error
+          port: ${{ env.SSH_PORT }}
+          script_stop: true
           script: |
             set -euo pipefail
+
             NAMESPACE="${{ steps.ns.outputs.namespace }}"
             IMAGE_TAG="${{ inputs.image_tag }}"
             ENV="${{ inputs.environment }}"
-            K8S_DIR="$HOME/.deploy/service-pulse-app/k8s"
+            # ⚠️  Path must match where scp-action places the files.
+            #     sync-manifests uses source:"k8s-manifests/" → files land at:
+            #     $HOME/.deploy/service-pulse-app/k8s-manifests/
+            K8S_DIR="$HOME/.deploy/service-pulse-app/k8s-manifests"
 
-            echo "▶ Environment : $ENV"
-            echo "▶ Namespace   : $NAMESPACE"
-            echo "▶ Image       : $IMAGE_TAG"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "  🚀 Deploying service-pulse-app"
+            echo "  Environment : $ENV"
+            echo "  Namespace   : $NAMESPACE"
+            echo "  Image       : $IMAGE_TAG"
+            echo "  Manifests   : $K8S_DIR"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-            # ── Ensure namespace exists ────────────────────────────────────────
-            kubectl get namespace "$NAMESPACE" 2>/dev/null \
-              || kubectl create namespace "$NAMESPACE" \
-              || kubectl apply -f "$K8S_DIR/namespace-${ENV}.yaml"
+            # ── Ensure namespace exists ──────────────────────────────────────
+            if ! kubectl get namespace "$NAMESPACE" &>/dev/null; then
+              echo "📁 Creating namespace: $NAMESPACE"
+              kubectl apply -f "$K8S_DIR/namespace-${ENV}.yaml"
+            fi
 
-            # ── Apply ConfigMap & base manifests ──────────────────────────────
-            kubectl apply -f "$K8S_DIR/configmap.yaml"     -n "$NAMESPACE"
-            kubectl apply -f "$K8S_DIR/secret.yaml"        -n "$NAMESPACE" || true  # skip if managed externally
-            kubectl apply -f "$K8S_DIR/mysql-pvc.yaml"     -n "$NAMESPACE"
-            kubectl apply -f "$K8S_DIR/mysql-deployment.yaml" -n "$NAMESPACE"
+            # ── Apply base infrastructure manifests ─────────────────────────
+            echo "📦 Applying ConfigMap..."
+            kubectl apply -f "$K8S_DIR/configmap.yaml" -n "$NAMESPACE"
 
-            # ── Patch image in the Deployment manifest and apply ──────────────
-            # We use kubectl set image for a clean, atomic image update without
-            # modifying the file on disk.
+            echo "🔒 Applying Secrets (skip if externally managed)..."
+            kubectl apply -f "$K8S_DIR/secret.yaml" -n "$NAMESPACE" || true
+
+            echo "💾 Applying MySQL PVC and Deployment..."
+            kubectl apply -f "$K8S_DIR/mysql-pvc.yaml"          -n "$NAMESPACE"
+            kubectl apply -f "$K8S_DIR/mysql-deployment.yaml"   -n "$NAMESPACE"
+
+            # ── Capture previous image for rollback ─────────────────────────
+            PREV_IMAGE=$(kubectl get deployment/service-pulse-app \
+              -n "$NAMESPACE" \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+            echo "🔖 Previous image: ${PREV_IMAGE:-none}"
+
+            # ── Apply app Deployment & update image atomically ───────────────
+            echo "🐳 Applying app Deployment manifest..."
             kubectl apply -f "$K8S_DIR/app-deployment.yaml" -n "$NAMESPACE"
+
+            echo "🐳 Updating image → $IMAGE_TAG"
             kubectl set image deployment/service-pulse-app \
               service-pulse-app="$IMAGE_TAG" \
               -n "$NAMESPACE"
 
-            # ── Wait for rollout to complete ──────────────────────────────────
-            echo "⏳ Waiting for rollout to complete (timeout 5m)..."
-            kubectl rollout status deployment/service-pulse-app \
-              -n "$NAMESPACE" --timeout=300s
+            # Annotate with deployment metadata for audit trail
+            kubectl annotate deployment/service-pulse-app \
+              -n "$NAMESPACE" \
+              deployment.kubernetes.io/deployed-by="github-actions" \
+              deployment.kubernetes.io/image="$IMAGE_TAG" \
+              deployment.kubernetes.io/env="$ENV" \
+              --overwrite
 
-            # ── Print final pod status ────────────────────────────────────────
+            # ── Wait for rollout ─────────────────────────────────────────────
+            echo "⏳ Waiting for rollout (timeout 5m)..."
+            if ! kubectl rollout status deployment/service-pulse-app \
+                   -n "$NAMESPACE" --timeout=300s; then
+              echo ""
+              echo "❌ Rollout failed! Initiating rollback to: ${PREV_IMAGE:-previous version}"
+              kubectl rollout undo deployment/service-pulse-app -n "$NAMESPACE"
+              kubectl rollout status deployment/service-pulse-app \
+                -n "$NAMESPACE" --timeout=120s
+              echo "⚠️  Rollback complete. Failing the workflow."
+              exit 1
+            fi
+
+            # ── Post-deploy status ───────────────────────────────────────────
             echo ""
-            echo "✅ Deployment complete!"
-            kubectl get pods -n "$NAMESPACE" -l app=service-pulse-app
+            echo "✅ Deployment successful!"
+            echo ""
+            echo "── Pods ────────────────────────────────────────────────────"
+            kubectl get pods -n "$NAMESPACE" -l app=service-pulse-app -o wide
+            echo ""
+            echo "── Deployment ──────────────────────────────────────────────"
+            kubectl get deployment/service-pulse-app -n "$NAMESPACE"
 
-      # ── 4. Upload manifests as artefact for audit trail ─────────────────────
+      # ── 4. Write GitHub Actions job summary ──────────────────────────────────
+      - name: Write deployment summary
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          ICON="✅"
+          [ "$STATUS" != "success" ] && ICON="❌"
+
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## ${ICON} Kubernetes Deployment — ${{ inputs.environment }}
+
+          | Field       | Value |
+          |-------------|-------|
+          | Environment | \`${{ inputs.environment }}\` |
+          | Namespace   | \`${{ steps.ns.outputs.namespace }}\` |
+          | Image       | \`${{ inputs.image_tag }}\` |
+          | Host        | \`${{ env.SSH_HOST }}\` |
+          | Status      | **${STATUS}** |
+          | Run         | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+          | Triggered by| \`${{ github.actor }}\` |
+          EOF
+
+      # ── 5. Archive manifests for audit trail ─────────────────────────────────
       - name: Archive deployed manifests
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: k8s-manifests-${{ inputs.environment }}-${{ github.run_number }}
-          path: k8s-manifests/    # checked-out copy of the separate manifests repo
+          path: k8s-manifests/
           retention-days: 30
+
+
