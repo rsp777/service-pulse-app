@@ -166,7 +166,7 @@ public class ManageServicesImpl implements ManageServices {
 			return "Service is already running";
 		}
 		log.info("Service : {}", service);
-		String command = startStopCommand(service, "SCRIPTS_HOME", "start");// buildStartCommand(agentId, service);
+		String command = startStopCommand(server, service, "SCRIPTS_HOME", "start");// buildStartCommand(agentId, service);
 		log.info("Command: {}", command);
 		String response = sshCommandService.execute(server, command);
 		if (isServiceRunning(serverId, service.serviceName())) {
@@ -194,7 +194,7 @@ public class ManageServicesImpl implements ManageServices {
 			return "Server is OFFLINE";
 		}
 
-		String command = startStopCommand(service, "SCRIPTS_HOME", "stop");// buildStopCommand(service, script);
+		String command = startStopCommand(server, service, "SCRIPTS_HOME", "stop");// buildStopCommand(service, script);
 		log.info("Command: {}", command);
 		String response = sshCommandService.execute(server, command);
 		boolean serviceRunning = isServiceRunning(serverId, service.serviceName());
@@ -206,27 +206,53 @@ public class ManageServicesImpl implements ManageServices {
 		return response;
 	}
 
-	private String startStopCommand(ServiceResponseDto service, String scriptsHome, String scriptName)
+	private String startStopCommand(ServerResponseDto server, ServiceResponseDto service, String scriptsHome, String scriptName)
 			throws PathOperationException, ResourceNotFoundException {
-		String pathAndScript = getPathAndScript(scriptsHome, scriptName);
+		String pathAndScript = getPathAndScript(server, scriptsHome, scriptName);
 		if (service == null) {
-
 			return String.format("%s", pathAndScript);
 		} else {
 			return String.format("%s %s", pathAndScript, service.serviceName());
 		}
 	}
 
-	private String getPathAndScript(String scriptsHome, String scriptName)
+	private String getPathAndScript(ServerResponseDto server, String scriptsHome, String scriptName)
 			throws PathOperationException, ResourceNotFoundException {
-		String path = pathService.findByPathName(scriptsHome)
-				.orElseThrow(() -> new PathOperationException("Path not found: " + scriptsHome)).pathName();
+		String scriptsDir = null;
+
+		// 1. Check server-specific configured paths for real directory
+		if (server != null && server.paths() != null) {
+			scriptsDir = server.paths().stream()
+					.filter(p -> scriptsHome.equalsIgnoreCase(p.pathName()))
+					.map(PathResponseDto::pathDescription)
+					.filter(desc -> desc != null && !desc.isBlank())
+					.findFirst()
+					.orElse(null);
+		}
+
+		// 2. Check global PathService for real directory
+		if (scriptsDir == null || scriptsDir.isBlank()) {
+			Optional<PathResponseDto> pathOpt = pathService.findByPathName(scriptsHome);
+			if (pathOpt.isPresent()) {
+				PathResponseDto p = pathOpt.get();
+				if (p.pathDescription() != null && !p.pathDescription().isBlank()) {
+					scriptsDir = p.pathDescription();
+				} else {
+					scriptsDir = "$" + p.pathName();
+				}
+			} else {
+				throw new PathOperationException("Path not found: " + scriptsHome);
+			}
+		}
+
+		scriptsDir = scriptsDir.trim().replaceAll("/+$", "");
+
 		Optional<ScriptResponseDto> scriptOptional = scriptService.findScriptByScriptName(scriptName);
 		ScriptResponseDto script = scriptOptional
 				.orElseThrow(() -> new ResourceNotFoundException("Script not found: " + scriptName));
 		String scriptName1 = script.scriptName();
 		ScriptExtension scriptExtension = scriptExtensionConverter.toEnum(script.scriptExtension());
-		return String.format("%s/%s%s", "$" + path, scriptName1, scriptExtension.getExtension());
+		return String.format("%s/%s%s", scriptsDir, scriptName1, scriptExtension.getExtension());
 	}
 
 	private void updateServiceHealthStatus(ServiceHealthStatusResponseDto serviceHealthStatus, String status,
@@ -263,7 +289,7 @@ public class ManageServicesImpl implements ManageServices {
 			log.info("Server {} is OFFLINE", server.hostname());
 			return "Server is OFFLINE";
 		}
-		String command = startStopCommand(null, "SCRIPTS_HOME", "startAll");// buildStartAllCommand();
+		String command = startStopCommand(server, null, "SCRIPTS_HOME", "startAll");// buildStartAllCommand();
 		log.info("Command: {}", command);
 		String response = sshCommandService.execute(server, command);
 		updateAllServiceHealthStatus(serverId, "UP", "startAllServices");
@@ -286,8 +312,7 @@ public class ManageServicesImpl implements ManageServices {
 			log.info("Server {} is OFFLINE", server.hostname());
 			return "Server is OFFLINE";
 		}
-		String command = startStopCommand(null, "SCRIPTS_HOME", "stopAll");
-		;
+		String command = startStopCommand(server, null, "SCRIPTS_HOME", "stopAll");
 		log.info("Command: {}", command);
 		String response = sshCommandService.execute(server, command);
 		updateAllServiceHealthStatus(serverId, "DOWN", "stopAllServices");
@@ -334,7 +359,7 @@ public class ManageServicesImpl implements ManageServices {
 			throws IOException, PathOperationException, ResourceNotFoundException, ServerOperationException,
 			ServiceHealthStatusOperationException, InterruptedException, ExecutionException {
 		String status = scriptName.startsWith("start") ? "UP" : "DOWN";
-		String command = startStopCommand(null, "SCRIPTS_HOME", scriptName);
+		String command = startStopCommand(server, null, "SCRIPTS_HOME", scriptName);
 		log.info("Streaming command: {}", command);
 		sshCommandService.stream(server, command, lineConsumer, stopped);
 		if (!stopped.get()) {
