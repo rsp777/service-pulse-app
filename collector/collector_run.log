@@ -1,0 +1,32 @@
+ __  __ _                                  _   
+|  \/  (_) ___ _ __ ___  _ __   __ _ _   _| |_ 
+| |\/| | |/ __| '__/ _ \| '_ \ / _` | | | | __|
+| |  | | | (__| | | (_) | | | | (_| | |_| | |_ 
+|_|  |_|_|\___|_|  \___/|_| |_|\__,_|\__,_|\__|
+[main] INFO com.example.collector.Application - Service Monitor Poller starting up...
+[main] INFO com.example.collector.Application - Scheduled polling every 60 seconds
+[main] INFO io.micronaut.runtime.Micronaut - No embedded container found. Running as CLI application
+[pool-1-thread-1] INFO com.example.collector.Application - Starting polling cycle...
+[pool-1-thread-1] ERROR com.example.collector.ServiceRepository - Error fetching services from DB: The connection attempt failed.
+[pool-1-thread-1] INFO com.example.collector.Application - Found 0 services to monitor
+[pool-1-thread-1] INFO com.example.collector.Application - Polling cycle complete.
+[pool-1-thread-1] INFO com.example.collector.Application - Starting polling cycle...
+[pool-1-thread-1] ERROR com.example.collector.ServiceRepository - Error fetching services from DB: The connection attempt failed.
+[pool-1-thread-1] INFO com.example.collector.Application - Found 0 services to monitor
+[pool-1-thread-1] INFO com.example.collector.Application - Polling cycle complete.
+[pool-1-thread-1] INFO com.example.collector.Application - Starting polling cycle...
+[pool-1-thread-1] ERROR com.example.collector.ServiceRepository - Error fetching services from DB: The connection attempt failed.
+[pool-1-thread-1] INFO com.example.collector.Application - Found 0 services to monitor
+[pool-1-thread-1] INFO com.example.collector.Application - Polling cycle complete.
+[pool-1-thread-1] INFO com.example.collector.Application - Starting polling cycle...
+[pool-1-thread-1] ERROR com.example.collector.ServiceRepository - Error fetching services from DB: The connection attempt failed.
+[pool-1-thread-1] INFO com.example.collector.Application - Found 0 services to monitor
+[pool-1-thread-1] INFO com.example.collector.Application - Polling cycle complete.
+[pool-1-thread-1] INFO com.example.collector.Application - Starting polling cycle...
+[pool-1-thread-1] ERROR com.example.collector.ServiceRepository - Error fetching services from DB: The connection attempt failed.
+[pool-1-thread-1] INFO com.example.collector.Application - Found 0 services to monitor
+[pool-1-thread-1] INFO com.example.collector.Application - Polling cycle complete.
+[pool-1-thread-1] INFO com.example.collector.Application - Starting polling cycle...
+[pool-1-thread-1] ERROR com.example.collector.ServiceRepository - Error fetching services from DB: The connection attempt failed.
+[pool-1-thread-1] INFO com.example.collector.Application - Found 0 services to monitor
+[pool-1-thread-1] INFO com.example.collector.Application - Polling cycle complete.

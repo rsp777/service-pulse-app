@@ -5,7 +5,7 @@ ARG APP_VERSION
 
 WORKDIR /app
 # Uses the ARG to dynamically resolve the correct JAR name
-COPY target/service-pulse-app-${APP_VERSION}.jar app.jar
+COPY target/service-pulse-app-${APP_VERSION}.jar service-pulse-app.jar
 
 EXPOSE 9092
 ENTRYPOINT ["java", "-jar", "service-pulse-app.jar"]
