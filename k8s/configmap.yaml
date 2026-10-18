@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-pulse-config
+  namespace: service-pulse
+  labels:
+    app.kubernetes.io/name: service-pulse-app
+data:
+  # ──────────────── Server ────────────────
+  SERVER_PORT: "9092"
+
+  # ──────────────── Database ────────────────
+  DB_URL: "jdbc:mysql://mysql-server:3306/service-pulse-app"
+  HIKARI_MAX_POOL_SIZE: "25"
+  JPA_DDL_AUTO: "none"
+
+  # ──────────────── Liquibase ────────────────
+  LIQUIBASE_ENABLED: "false"
+
+  # ──────────────── Timeouts ────────────────
+  CONNECTION_TIMEOUT: "20"
+  RESPONSE_TIMEOUT: "20"
+  CONNECTION_REQUEST_TIMEOUT: "20"
+
+  # ──────────────── Health Check & Alerts ────────────────
+  HEALTHCHECK_CRON: "0 0/1 * * * *"
+  HEALTHCHECK_ENABLED: "false"
+  SERVICE_MANAGEMENT_ENABLED: "false"
+  ALERT_MANAGEMENT_ENABLED: "false"
+  ALERT_CRON: "0 0/1 * * * *"
+  BACKFILL_DATA_POPULATE_ENABLED: "true"
+
+  # ──────────────── Spring ────────────────
+  SPRING_ALLOW_BEAN_DEFINITION_OVERRIDING: "true"
+  SPRING_ALLOW_CIRCULAR_REFERENCES: "true"
+
+  # ──────────────── Actuator ────────────────
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,logfile"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+  MANAGEMENT_ENDPOINT_SHUTDOWN_ENABLED: "false"
+  MANAGEMENT_INFO_ENV_ENABLED: "true"
+
+  # ──────────────── SSH (non-sensitive) ────────────────
+  SSH_PRIVATE_KEY_PATH: "/app/.ssh/id_ed25519"
+  SSH_KNOWN_HOSTS_PATH: "/app/.ssh/known_hosts"
+  SSH_STRICT_HOST_KEY_CHECKING: "false"
+  SSH_PORT: "22"
+  SSH_CONNECT_TIMEOUT_MILLIS: "10000"
+  SSH_COMMAND_TIMEOUT_SECONDS: "60"
+
+  # ──────────────── MySQL ────────────────
+  MYSQL_DATABASE: "service-pulse-app"

@@ -1,1622 +1,679 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <base href="/service-pulse-app/" />
-    <title>Service Pulse</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --ink: #17212b;
-        --muted: #64717d;
-        --line: #dce3e8;
-        --paper: #f5f7f8;
-        --card: #fff;
-        --accent: #0e7490;
-        --accent-dark: #075985;
-        --ok: #18794e;
-        --bad: #b42318;
-        --warn: #a16207;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        background: var(--paper);
-        color: var(--ink);
-        font:
-          15px/1.5 "DM Sans",
-          sans-serif;
-      }
-      .app {
-        display: flex;
-        min-height: 100vh;
-      }
-      .sidebar {
-        width: 245px;
-        background: #12343b;
-        color: #fff;
-        padding: 24px 0;
-        flex: none;
-      }
-      .brand {
-        padding: 0 22px 25px;
-        border-bottom: 1px solid #ffffff26;
-      }
-      .brand h1 {
-        font-size: 20px;
-        margin: 0;
-      }
-      .brand p {
-        color: #b8d4d8;
-        margin: 4px 0 0;
-        font-size: 12px;
-      }
-      .nav {
-        padding-top: 20px;
-      }
-      .nav button {
-        display: block;
-        width: 100%;
-        padding: 13px 22px;
-        border: 0;
-        border-left: 3px solid transparent;
-        background: transparent;
-        color: #c7d9dc;
-        text-align: left;
-        cursor: pointer;
-      }
-      .nav button.active,
-      .nav button:hover {
-        background: #ffffff12;
-        border-left-color: #55c2cf;
-        color: #fff;
-      }
-      .main {
-        flex: 1;
-        padding: 30px;
-        min-width: 0;
-      }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 22px;
-      }
-      .header h2 {
-        margin: 0;
-        font-size: 26px;
-      }
-      .toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: stretch;
-        gap: 12px;
-      }
-      .btn {
-        border: 0;
-        border-radius: 5px;
-        padding: 9px 13px;
-        background: var(--accent);
-        color: #fff;
-        cursor: pointer;
-        font-weight: 600;
-      }
-      .btn:hover {
-        background: var(--accent-dark);
-      }
-      .btn.secondary {
-        background: #e8eef0;
-        color: var(--ink);
-      }
-      .btn.danger {
-        background: #a53a32;
-      }
-      .panel,
-      .card {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        box-shadow: 0 2px 8px #17313d0d;
-      }
-      .panel {
-        padding: 18px;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-      }
-      .card {
-        padding: 18px;
-      }
-      .full {
-        grid-column: 1/-1;
-      }
-      .server-list {
-        display: grid;
-        gap: 8px;
-        margin-top: 16px;
-      }
-      .server-item {
-        width: 100%;
-        padding: 12px;
-        border: 1px solid var(--line);
-        background: #fff;
-        color: var(--ink);
-        text-align: left;
-        cursor: pointer;
-      }
-      .server-item.active {
-        border-color: var(--accent);
-        box-shadow: inset 3px 0 var(--accent);
-      }
-      .server-item strong,
-      .server-item small {
-        display: block;
-      }
-      .server-item small,
-      label {
-        color: var(--muted);
-      }
-      label {
-        display: block;
-        margin: 11px 0 4px;
-        font-size: 13px;
-      }
-      input,
-      select,
-      textarea {
-        width: 100%;
-        padding: 9px 10px;
-        border: 1px solid #c8d2d8;
-        border-radius: 5px;
-        background: #fff;
-        color: var(--ink);
-      }
-      label input[type="checkbox"] {
-        width: auto;
-        margin-right: 8px;
-      }
-      textarea {
-        min-height: 92px;
-        resize: vertical;
-      }
-      .service {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--line);
-      }
-      .service:last-child {
-        border: 0;
-      }
-      .service small {
-        display: block;
-        color: var(--muted);
-      }
-      .actions {
-        white-space: nowrap;
-      }
-      .status {
-        display: inline-block;
-        padding: 2px 7px;
-        border-radius: 10px;
-        font-size: 12px;
-        background: #e5f3ec;
-        color: var(--ok);
-      }
-      .status.offline {
-        background: #fce9e7;
-        color: var(--bad);
-      }
-      #notice {
-        min-height: 25px;
-        margin-bottom: 10px;
-        color: var(--muted);
-      }
-      #notice.error {
-        color: var(--bad);
-      }
-      #output {
-        white-space: pre-wrap;
-        overflow: auto;
-        max-height: 300px;
-        background: #17212b;
-        color: #d9eef0;
-        padding: 14px;
-        border-radius: 5px;
-      }
-      .page {
-        display: none;
-      }
-      .page.active {
-        display: block;
-      }
-      .modal {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: #0008;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-        z-index: 2;
-      }
-      .modal.active {
-        display: flex;
-      }
-      .modal-content {
-        background: #fff;
-        border-radius: 8px;
-        width: (560px, 100%);
-        max-height: 90vh;
-        overflow: auto;
-        padding: 22px;
-      }
-      .modal-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .modal-header h3 {
-        margin: 0;
-      }
-      .close {
-        border: 0;
-        background: transparent;
-        font-size: 24px;
-        color: var(--muted);
-        cursor: pointer;
-      }
-      .modal-footer {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-top: 18px;
-      }
-      .context {
-        display: none;
-        position: fixed;
-        background: #fff;
-        border: 1px solid var(--line);
-        box-shadow: 0 6px 20px #17313d33;
-        z-index: 3;
-      }
-      .context.active {
-        display: block;
-      }
-      .context button {
-        display: block;
-        width: 150px;
-        border: 0;
-        background: #fff;
-        padding: 10px;
-        text-align: left;
-        cursor: pointer;
-      }
-      .context button:hover {
-        background: #edf7f8;
-      }
-      @media (max-width: 800px) {
-        .app {
-          display: block;
-        }
-        .sidebar {
-          width: auto;
-          padding: 14px;
-        }
-        .brand {
-          padding: 0 8px 12px;
-        }
-        .nav {
-          display: flex;
-          padding: 10px 0 0;
-          gap: 5px;
-        }
-        .nav button {
-          padding: 9px;
-          border: 0;
-          text-align: center;
-        }
-        .main {
-          padding: 18px;
-        }
-        .grid {
-          grid-template-columns: 1fr;
-        }
-        .full {
-          grid-column: auto;
-        }
-        .header {
-          align-items: flex-start;
-          flex-direction: column;
-        }
-        #logs-output,
-        #output,
-        .logs-container {
-          white-space: pre-wrap; /* Forces text to respect newlines AND wrap */
-          word-break: break-all; /* Prevents long strings from breaking the modal */
-          overflow-x: hidden;
-          background: #17212b;
-          color: #d9eef0;
-          padding: 14px;
-          border-radius: 5px;
-          margin: 0;
-        }
-      }
-    </style>
-  </head>
-  <body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/service-pulse-app/">
+    <title>Service Pulse | Enterprise Linux Operations</title>
+    <meta name="description" content="Agentless Linux service health monitoring, remote operations, and alert management">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
     <div class="app">
-      <aside class="sidebar">
-        <div class="brand">
-          <h1>Service Pulse</h1>
-          <p>Agentless Linux operations</p>
-        </div>
-        <nav class="nav">
-          <button class="active" data-page="dashboard">Dashboard</button
-          ><button data-page="servers">Servers</button
-          ><button data-page="commands">Commands</button
-          ><button data-page="alerts" id="alerts-nav">Alerts</button
-          ><button data-page="sdui-admin">SDUI Admin</button
-          ><button data-page="settings">Settings</button>
-        </nav>
-      </aside>
-      <main class="main">
-        <div id="notice" role="status"></div>
-        <section id="dashboard" class="page active">
-          <div class="header">
-            <h2>Service Health Dashboard</h2>
-            <div>
-              <button class="btn" id="add-server">+ Add server</button
-              ><button class="btn" id="add-service">+ Add service</button>
-            </div>
-          </div>
-          <div class="grid">
-            <article class="card">
-              <h2 id="selected-title">Select a server</h2>
-              <p id="selected-meta">Choose a server to manage its services.</p>
-              <label for="server-select">Server</label
-              ><select id="server-select">
-                <option value="">-- Select a server --</option>
-              </select>
-            </article>
-            <article class="card">
-              <h2>SSH command</h2>
-              <form id="command-form">
-                <label for="command-select">Configured command</label>
-                <select id="command-select">
-                  <option value="">Custom command</option>
-                </select>
-                <label for="command">Command</label
-                ><textarea
-                  id="command"
-                  required
-                  placeholder="systemctl status nginx"
-                ></textarea
-                ><button class="btn" type="submit">Run command</button>
-              </form>
-            </article>
-            <article class="card full">
-              <div class="toolbar">
-                <h2>Services</h2>
-                <div class="actions">
-                  <button class="btn secondary" id="refresh-services">Refresh</button>
-                  <button class="btn secondary" id="start-all-services" hidden>Start All</button>
-                  <button class="btn secondary" id="stop-all-services" hidden>Stop All</button>
-                  <button class="btn secondary" id="restart-all-services" hidden>Restart All</button>
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-title">
+                    <div class="brand-icon">⚡</div>
+                    <div>
+                        <h1>Service Pulse</h1>
+                        <p>Linux Operations & APM</p>
+                    </div>
                 </div>
-              </div>
-              <div id="service-list">Select a server to load services.</div>
-            </article>
-            <article class="card full">
-              <h2>Command output</h2>
-              <pre id="output">No command run.</pre>
-            </article>
-          </div>
-        </section>
-        <section id="servers" class="page">
-          <div class="header">
-            <h2>Manage Servers</h2>
-            <button class="btn" id="add-server-page">+ Add server</button>
-          </div>
-          <div class="card" id="server-table"></div>
-        </section>
-        <section id="commands" class="page">
-          <div class="header">
-            <h2>Manage Commands</h2>
-            <button class="btn" id="add-command">+ Add command</button>
-          </div>
-          <div class="card">
-            <div class="toolbar">
-              <p>Commands are executed through SSH on the selected server.</p>
-              <button class="btn secondary" id="refresh-commands">
-                Refresh
-              </button>
             </div>
-            <div id="command-table">Loading commands...</div>
-          </div>
-        </section>
-        <section id="alerts" class="page">
-          <div class="header"><h2>Alert Management</h2><button class="btn" id="add-alert">+ Add alert</button></div>
-          <div class="card"><div class="toolbar"><h2>Alert rules</h2><button class="btn secondary" id="refresh-alerts">Refresh</button></div><div id="alert-table">Loading alerts...</div></div>
-          <div class="card"><h2>Recent triggered alerts</h2><div id="alert-events">Loading alert history...</div></div>
-        </section>
-        <section id="sdui-admin" class="page">
-          <div class="header"><h2>Screen Definitions</h2><button class="btn" id="add-sdui-action">+ Add screen</button></div>
-          <div class="card"><div class="toolbar"><h2>Configured screens</h2><button class="btn secondary" id="refresh-sdui-actions">Refresh</button></div><div id="sdui-actions-table">Loading screens...</div></div>
-        </section>
-        <section id="settings" class="page">
-          <div class="header"><h2>Settings</h2></div>
-          <div class="card">
-            <p>
-              SSH keys and known hosts are configured on the application server
-              through environment-backed properties. Private keys are never
-              stored in this browser or in server records.
-            </p>
-          </div>
-          <div class="card">
-            <div class="toolbar"><h2>Runtime configuration</h2><span id="runtime-config-status">Loading...</span></div>
-            <div class="grid">
-              <label><input id="healthcheck-enabled" type="checkbox"/> Scheduled health checks enabled</label>
-              <label><input id="service-management-enabled" type="checkbox"/> Remote service management enabled</label>
-              <label><input id="alert-management-enabled" type="checkbox"/> Alert management enabled</label>
-              <label><input id="backend-alert-configuration" type="checkbox"/> Backend alert configuration enabled</label>
-              <label for="healthcheck-cron">Health-check schedule</label>
-              <input id="healthcheck-cron" readonly />
+            <nav class="nav">
+                <button class="active" data-page="dashboard">
+                    <span class="nav-icon">📊</span> Dashboard
+                </button>
+                <button data-page="servers">
+                    <span class="nav-icon">🖥️</span> Servers
+                </button>
+                <button data-page="services">
+                    <span class="nav-icon">⚙️</span> Services
+                </button>
+                <button data-page="commands">
+                    <span class="nav-icon">⚡</span> Commands
+                </button>
+                <button data-page="alerts" id="alerts-nav">
+                    <span class="nav-icon">🚨</span> Alerts
+                </button>
+                <button data-page="logs">
+                    <span class="nav-icon">📜</span> System Logs
+                </button>
+                <button data-page="settings">
+                    <span class="nav-icon">🛠️</span> Settings
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                Service Pulse v0.0.4 · Spring Boot 3
             </div>
-            <small>The scheduler interval is read at startup. Feature flags are stored by the application and take effect immediately.</small>
-            <div class="modal-footer"><button class="btn" id="save-runtime-config" type="button">Save configuration</button></div>
-          </div>
-          <div class="grid">
-            <article class="card">
-              <div class="toolbar"><h2>Paths</h2><button class="btn" id="add-path">+ Add path</button></div>
-              <div id="path-table">Loading paths...</div>
-            </article>
-            <article class="card">
-              <div class="toolbar"><h2>Scripts</h2><button class="btn" id="add-script">+ Add script</button></div>
-              <div id="script-table">Loading scripts...</div>
-            </article>
-          </div>
-        </section>
-      </main>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main">
+            <!-- Header Bar -->
+            <header class="header">
+                <div class="header-left">
+                    <h2>Infrastructure & Operations</h2>
+                    <p>Agentless remote execution and real-time service observability</p>
+                </div>
+                <div class="header-right">
+                    <!-- Notification Bell -->
+                    <div class="notification-container">
+                        <button id="notification-bell" class="notification-bell" aria-label="Notifications">
+                            🔔<span id="notification-badge" class="notification-badge" style="display: none;">0</span>
+                        </button>
+                        <div id="notification-dropdown" class="notification-dropdown">
+                            <div class="notification-header">
+                                <h4>System Alerts</h4>
+                                <button id="mark-all-read" class="mark-all-read">Mark all as read</button>
+                            </div>
+                            <div id="notification-list" class="notification-list">
+                                <div class="empty-state">No unread alerts.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Global Notice Bar -->
+            <div id="notice" role="status"></div>
+
+            <!-- Page 1: Dashboard -->
+            <section id="dashboard" class="page active">
+                <!-- Stats Overview -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">🖥️</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stat-servers-count">0</div>
+                            <div class="stat-label">Registered Servers</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">⚙️</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stat-services-count">0 / 0</div>
+                            <div class="stat-label">Services Online</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon amber">🚨</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stat-alerts-count">0</div>
+                            <div class="stat-label">Active Alerts</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">⚡</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stat-ssh-status">Ready</div>
+                            <div class="stat-label">SSH Execution Engine</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Server & Command Grid -->
+                <div class="grid">
+                    <article class="card">
+                        <div class="card-title-bar">
+                            <h3 id="selected-title">Select a server</h3>
+                            <button class="btn btn-sm" id="add-server">+ Add server</button>
+                        </div>
+                        <p id="selected-meta" style="color: var(--muted); margin-bottom: 16px;">
+                            Choose a server to view and execute commands against its services.
+                        </p>
+                        <label for="server-select">Active Server Context</label>
+                        <select id="server-select">
+                            <option value="">-- Select a Server --</option>
+                        </select>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-title-bar">
+                            <h3>SSH Remote Execution</h3>
+                        </div>
+                        <form id="command-form">
+                            <label for="command-select">Preconfigured Command</label>
+                            <select id="command-select">
+                                <option value="">Custom command</option>
+                            </select>
+                            <label for="command">Command String</label>
+                            <textarea id="command" required placeholder="systemctl status nginx"></textarea>
+                            <div style="margin-top: 14px; text-align: right;">
+                                <button class="btn" type="submit">Run command</button>
+                            </div>
+                        </form>
+                    </article>
+
+                    <!-- Monitored Services for Selected Server -->
+                    <article class="card full">
+                        <div class="toolbar">
+                            <h2>Monitored Services</h2>
+                            <div class="service-actions">
+                                <button class="btn secondary btn-sm" id="refresh-services">Refresh</button>
+                                <button class="btn success btn-sm" id="start-all-services" hidden>Start All</button>
+                                <button class="btn secondary btn-sm" id="stop-all-services" hidden>Stop All</button>
+                                <button class="btn secondary btn-sm" id="restart-all-services" hidden>Restart All</button>
+                                <button class="btn btn-sm" id="add-service">+ Add service</button>
+                            </div>
+                        </div>
+                        <div id="service-list" style="margin-top: 16px;">
+                            <div class="empty-state">Select a server to load services.</div>
+                        </div>
+                    </article>
+
+                    <!-- Terminal Console -->
+                    <article class="card full">
+                        <div class="terminal-window">
+                            <div class="terminal-header">
+                                <div class="terminal-title">
+                                    <div class="terminal-dots">
+                                        <div class="terminal-dot dot-red"></div>
+                                        <div class="terminal-dot dot-yellow"></div>
+                                        <div class="terminal-dot dot-green"></div>
+                                    </div>
+                                    <span>CONSOLE // APM OUTPUT</span>
+                                </div>
+                                <div class="terminal-actions">
+                                    <button class="terminal-btn" id="terminal-copy-btn">Copy Output</button>
+                                    <button class="terminal-btn" id="terminal-clear-btn">Clear</button>
+                                </div>
+                            </div>
+                            <pre id="output" class="terminal-body">Waiting for command or lifecycle output...</pre>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Page 2: Servers Management -->
+            <section id="servers" class="page">
+                <div class="card">
+                    <div class="toolbar">
+                        <div>
+                            <h2>Server Inventory</h2>
+                            <p style="margin: 4px 0 0; color: var(--muted); font-size: 13.5px;">Manage Linux hosts configured for agentless SSH execution</p>
+                        </div>
+                        <button class="btn" id="add-server-page">+ Add server</button>
+                    </div>
+                    <div id="server-table" style="margin-top: 20px;">
+                        <div class="empty-state">Loading servers...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page 3: Services Management -->
+            <section id="services" class="page">
+                <div class="card">
+                    <div class="toolbar">
+                        <div>
+                            <h2>Service Registry</h2>
+                            <p style="margin: 4px 0 0; color: var(--muted); font-size: 13.5px;">Overview of all Spring Boot and custom applications across servers</p>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="service-filter-server" style="width: 220px;">
+                                <option value="">All Servers</option>
+                            </select>
+                            <button class="btn" id="add-service-page">+ Add service</button>
+                        </div>
+                    </div>
+                    <div id="all-services-table" style="margin-top: 20px;">
+                        <div class="empty-state">Loading services...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page 4: Commands Management -->
+            <section id="commands" class="page">
+                <div class="card">
+                    <div class="toolbar">
+                        <div>
+                            <h2>Preconfigured Commands</h2>
+                            <p style="margin: 4px 0 0; color: var(--muted); font-size: 13.5px;">Reusable command templates executed via authenticated SSH</p>
+                        </div>
+                        <div class="service-actions">
+                            <button class="btn secondary" id="refresh-commands">Refresh</button>
+                            <button class="btn" id="add-command">+ Add command</button>
+                        </div>
+                    </div>
+                    <div id="command-table" style="margin-top: 20px;">
+                        <div class="empty-state">Loading commands...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page 5: Alerts Management -->
+            <section id="alerts" class="page">
+                <div class="card">
+                    <div class="toolbar" style="margin-bottom: 20px;">
+                        <div>
+                            <h2>Alert & Condition Management</h2>
+                            <p style="margin: 4px 0 0; color: var(--muted); font-size: 13.5px;">Threshold rules, triggered audit trails, and condition type mappings</p>
+                        </div>
+                        <div class="service-actions">
+                            <button class="btn secondary" id="refresh-alerts">Refresh</button>
+                            <button class="btn" id="add-alert">+ Add alert rule</button>
+                        </div>
+                    </div>
+
+                    <!-- Sub Tabs -->
+                    <div class="tabs">
+                        <button class="tab-btn active" data-alert-tab="rules">Alert Rules</button>
+                        <button class="tab-btn" data-alert-tab="events">Triggered Events Log</button>
+                        <button class="tab-btn" data-alert-tab="conditions">Condition Types & Mappings</button>
+                    </div>
+
+                    <!-- Tab 1: Alert Rules -->
+                    <div id="alert-tab-rules">
+                        <div id="alert-rules-table">Loading rules...</div>
+                    </div>
+
+                    <!-- Tab 2: Triggered Events -->
+                    <div id="alert-tab-events" style="display: none;">
+                        <div style="margin-bottom: 16px; text-align: right;">
+                            <button class="btn secondary btn-sm" id="open-log-event-modal">+ Log Alert Event</button>
+                        </div>
+                        <div id="alert-events-table">Loading events...</div>
+                    </div>
+
+                    <!-- Tab 3: Condition Types & Mappings -->
+                    <div id="alert-tab-conditions" style="display: none;">
+                        <div id="condition-types-table">Loading condition types...</div>
+                        <div id="condition-mappings-container" style="display: none; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line);">
+                            <div class="toolbar" style="margin-bottom: 14px;">
+                                <h3 id="selected-condition-type-title" style="margin: 0;">Condition Mappings</h3>
+                                <button class="btn btn-sm" id="add-condition-mapping-btn">+ Add mapping</button>
+                            </div>
+                            <div id="condition-mappings-list">Select a condition type above to view mappings.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page 6: System Logs Viewer -->
+            <section id="logs" class="page">
+                <div class="card">
+                    <div class="toolbar" style="margin-bottom: 16px;">
+                        <div>
+                            <h2>Live System Logs</h2>
+                            <p style="margin: 4px 0 0; color: var(--muted); font-size: 13.5px;">Real-time SSE log stream from application runtime ring buffer</p>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <select id="log-level-filter" style="width: 140px;">
+                                <option value="ALL">All Levels</option>
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO" selected>INFO</option>
+                                <option value="WARN">WARN</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                            <label class="checkbox-field" style="margin: 0; font-size: 13px;">
+                                <input type="checkbox" id="log-autoscroll-toggle" checked> Auto-scroll
+                            </label>
+                            <button class="btn secondary btn-sm" id="pause-system-logs-btn">Pause Stream</button>
+                            <button class="btn secondary btn-sm" id="clear-system-logs-btn">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="terminal-window">
+                        <div class="terminal-header">
+                            <div class="terminal-title">
+                                <div class="terminal-dots">
+                                    <div class="terminal-dot dot-red"></div>
+                                    <div class="terminal-dot dot-yellow"></div>
+                                    <div class="terminal-dot dot-green"></div>
+                                </div>
+                                <span>LIVE SSE STREAM // /api/system/logs/stream</span>
+                            </div>
+                        </div>
+                        <pre id="system-logs-body" class="terminal-body" style="min-height: 480px; max-height: 650px;">Connecting to system log stream...</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page 7: Settings -->
+            <section id="settings" class="page">
+                <div class="card">
+                    <div class="toolbar">
+                        <h2>Runtime Configuration</h2>
+                        <span id="runtime-config-status" style="font-size: 13px; color: var(--muted);">Loading...</span>
+                    </div>
+                    <div class="grid" style="margin-top: 16px;">
+                        <label class="checkbox-field">
+                            <input id="healthcheck-enabled" type="checkbox"> Scheduled health checks enabled
+                        </label>
+                        <label class="checkbox-field">
+                            <input id="service-management-enabled" type="checkbox"> Remote service management enabled
+                        </label>
+                        <label class="checkbox-field">
+                            <input id="alert-management-enabled" type="checkbox"> Alert management enabled
+                        </label>
+                        <label class="checkbox-field">
+                            <input id="health-status-population-enabled" type="checkbox"> Health status population enabled
+                        </label>
+                        <div style="grid-column: 1 / -1;">
+                            <label for="healthcheck-cron">Health Check Cron Schedule</label>
+                            <input id="healthcheck-cron" readonly>
+                            <small style="color: var(--muted); display: block; margin-top: 4px;">
+                                Configured via application environment (e.g. <code>0 0/1 * * * *</code>).
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="margin-top: 20px;">
+                        <button class="btn" id="save-runtime-config" type="button">Save Configuration</button>
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <article class="card">
+                        <div class="toolbar">
+                            <h2>Configured Paths</h2>
+                            <button class="btn btn-sm" id="add-path">+ Add path</button>
+                        </div>
+                        <div id="path-table" style="margin-top: 16px;">Loading paths...</div>
+                    </article>
+                    <article class="card">
+                        <div class="toolbar">
+                            <h2>Configured Scripts</h2>
+                            <button class="btn btn-sm" id="add-script">+ Add script</button>
+                        </div>
+                        <div id="script-table" style="margin-top: 16px;">Loading scripts...</div>
+                    </article>
+                </div>
+            </section>
+        </main>
     </div>
+
+    <!-- Modals -->
+    <!-- Server Modal -->
     <div class="modal" id="server-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Server</h3>
-          <button class="close" data-close="server-modal">&times;</button>
-        </div>
-        <form id="server-form">
-          <input type="hidden" id="server-id" /><label for="hostname"
-            >Name</label
-          ><input id="hostname" required placeholder="prod-web-01" /><label
-            for="ip-address"
-            >Hostname or IP</label
-          ><input id="ip-address" required /><label for="os-type">OS</label
-          ><input id="os-type" value="Linux" /><label for="server-status"
-            >Status</label
-          ><select id="server-status">
-            <option>ONLINE</option>
-            <option>OFFLINE</option>
-            <option>UNKNOWN</option>
-          </select>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn secondary"
-              data-close="server-modal"
-            >
-              Cancel</button
-            ><button class="btn" type="submit">Save server</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    <div class="modal" id="service-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Service</h3>
-          <button class="close" data-close="service-modal">&times;</button>
-        </div>
-        <form id="service-form">
-          <input type="hidden" id="service-id" />
-          <label for="service-server">Server</label
-          ><select id="service-server" required></select
-          ><label for="service-name">Service name</label
-          ><input id="service-name" required /><label for="service-type"
-            >Service type</label
-          ><select id="service-type">
-            <option value="SPRING_BOOT">Spring Boot</option>
-            <option value="OTHER">Other</option></select
-          ><label for="logs-path">LOGS path</label
-          ><input id="logs-path" placeholder="/opt/apps/logs" /><label
-            for="scripts-path"
-            >Scripts path</label
-          ><input id="scripts-path" placeholder="/opt/apps/scripts" />
-          <div id="spring-boot-fields">
-            <label for="actuator-port">Actuator port</label
-            ><input
-              id="actuator-port"
-              type="number"
-              value="8080"
-              min="1"
-              max="65535"
-            /><label for="context-path">Context path</label
-            ><input id="context-path" placeholder="/inventory-management-app" />
-            <p>
-              <small
-                >Health and info URLs are generated automatically for Spring
-                Boot services.</small
-              >
-            </p>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn secondary"
-              data-close="service-modal"
-            >
-              Cancel</button
-            ><button class="btn" type="submit">Save service</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    <div class="modal" id="logs-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Service logs</h3>
-          <button class="close" data-close="logs-modal">&times;</button>
-        </div>
-        <pre id="logs-output">No logs loaded.</pre>
-      </div>
-    </div>
-    <div class="modal" id="scripts-unavailable-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Scripts unavailable</h3>
-          <button class="close" data-close="scripts-unavailable-modal">&times;</button>
-        </div>
-        <p id="scripts-unavailable-message">The requested scripts are unavailable on this server.</p>
-        <div class="modal-footer">
-          <button class="btn" data-close="scripts-unavailable-modal" type="button">Close</button>
-        </div>
-      </div>
-    </div>
-    <div class="modal" id="command-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Command</h3>
-          <button class="close" data-close="command-modal">&times;</button>
-        </div>
-        <form id="command-crud-form">
-          <input type="hidden" id="command-id" />
-          <label for="command-name">Name</label>
-          <input id="command-name" required placeholder="tail" />
-          <label for="command-description">Description</label>
-          <input id="command-description" required placeholder="StreamLogs" />
-          <label for="command-parameters">Parameters</label>
-          <input id="command-parameters" placeholder="-n 100 -F" />
-          <label for="command-status">Status</label>
-          <select id="command-status">
-            <option>CREATED</option>
-            <option>PENDING</option>
-            <option>IN_PROGRESS</option>
-            <option>COMPLETED</option>
-            <option>FAILED</option>
-          </select>
-          <label for="command-result">Result</label>
-          <textarea
-            id="command-result"
-            placeholder="Optional execution result"
-          ></textarea>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn secondary"
-              data-close="command-modal"
-            >
-              Cancel
-            </button>
-            <button class="btn" type="submit">Save command</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    <div class="modal" id="path-modal"><div class="modal-content"><div class="modal-header"><h3>Path</h3><button class="close" data-close="path-modal">&times;</button></div><form id="path-crud-form"><input type="hidden" id="path-id"><label for="path-name">Name</label><input id="path-name" required placeholder="LOGS_HOME"><label for="path-description">Filesystem path</label><input id="path-description" required placeholder="/opt/apps/logs"><label for="path-server">Server</label><select id="path-server" required></select><div class="modal-footer"><button type="button" class="btn secondary" data-close="path-modal">Cancel</button><button class="btn" type="submit">Save path</button></div></form></div></div>
-    <div class="modal" id="script-modal"><div class="modal-content"><div class="modal-header"><h3>Script</h3><button class="close" data-close="script-modal">&times;</button></div><form id="script-crud-form"><input type="hidden" id="script-id"><label for="script-name">Name</label><input id="script-name" required placeholder="start"><label for="script-extension">Extension</label><select id="script-extension"><option value="SH">SH</option><option value="BASH">BASH</option><option value="BAT">BAT</option></select><div class="modal-footer"><button type="button" class="btn secondary" data-close="script-modal">Cancel</button><button class="btn" type="submit">Save script</button></div></form></div></div>
-    <div class="modal" id="alert-modal"><div class="modal-content"><div class="modal-header"><h3>Alert rule</h3><button class="close" data-close="alert-modal">&times;</button></div><form id="alert-form"><input type="hidden" id="alert-id"><label for="alert-name">Name</label><input id="alert-name" required placeholder="Payments down"><label for="alert-target-type">Target</label><select id="alert-target-type"><option value="SERVER">Server</option><option value="SERVICE">Service</option></select><label for="alert-server">Server</label><select id="alert-server"></select><label for="alert-service">Service</label><select id="alert-service"></select><label for="alert-condition-type">Condition</label><select id="alert-condition-type"><option value="STATUS">Health status</option><option value="RESPONSE_TIME">Response time</option></select><label for="alert-operator">Operator</label><select id="alert-operator"><option value="EQUALS">Equals</option><option value="NOT_EQUALS">Not equals</option></select><label for="alert-condition-value">Expected value</label><input id="alert-condition-value" required placeholder="DOWN"><label><input id="alert-enabled" type="checkbox" checked> Alert enabled</label><div class="modal-footer"><button type="button" class="btn secondary" data-close="alert-modal">Cancel</button><button class="btn" type="submit">Save alert</button></div></form></div></div>
-    <div class="modal" id="sdui-action-modal"><div class="modal-content" style="max-height: 95vh; overflow-y: auto;"><div class="modal-header"><h3>Screen Definition</h3><button class="close" data-close="sdui-action-modal">&times;</button></div><form id="sdui-action-form"><input type="hidden" id="sdui-action-id"><label for="sdui-view-context">View Context *</label><input id="sdui-view-context" required placeholder="e.g., dashboard, analytics"><label for="sdui-action-label">Action Label *</label><input id="sdui-action-label" required placeholder="e.g., Export Data"><label for="sdui-action-endpoint">Action Endpoint *</label><input id="sdui-action-endpoint" required placeholder="e.g., /api/analytics/export"><label for="sdui-component-type">Component Type</label><select id="sdui-component-type"><option value="ACTION">ACTION</option><option value="FORM">FORM</option><option value="MENU">MENU</option><option value="PANEL">PANEL</option></select><label for="sdui-sidebar-category">Sidebar Category</label><input id="sdui-sidebar-category" placeholder="e.g., Reporting"><label for="sdui-panel-title">Panel Title</label><input id="sdui-panel-title" placeholder="e.g., Export"><label for="sdui-grid-span">Grid Span</label><select id="sdui-grid-span"><option value="span-12">span-12 (Full width)</option><option value="span-6">span-6 (Half width)</option><option value="span-4">span-4 (Third width)</option></select><label for="sdui-icon-class">Icon Class</label><input id="sdui-icon-class" placeholder="e.g., icon-export"><label for="sdui-component-config">Component Config (JSON)</label><textarea id="sdui-component-config" placeholder='{\n  "endpoint": "/api/analytics/export",\n  "method": "POST",\n  "fields": [{\n    "name": "format",\n    "type": "select",\n    "options": ["CSV", "JSON"]\n  }]\n}' style="font-family: monospace; font-size: 12px; min-height: 150px;"></textarea><label for="sdui-request-payload">Request Payload (JSON)</label><textarea id="sdui-request-payload" placeholder='{\n  "defaultFormat": "CSV"\n}' style="font-family: monospace; font-size: 12px; min-height: 100px;"></textarea><div class="modal-footer"><button type="button" class="btn secondary" data-close="sdui-action-modal">Cancel</button><button class="btn" type="submit">Save screen</button></div></form></div></div>
-    <div class="context" id="context">
-      <button data-action="logs">View logs</button
-      ><button data-action="start">Start service</button
-      ><button data-action="stop">Stop service</button
-      ><button data-action="details">View details</button>
-    </div>
-    <script>
-      (() => {
-        const state = {
-          servers: [],
-          selected: null,
-          service: null,
-          commands: [],
-          paths: [],
-          scripts: [],
-          alerts: [],
-          alertEvents: [],
-          serverServiceConfigurations: [],
-        };
-        let currentLogStream = null;
-        let currentServiceActionStream = null;
-        const $ = (id) => document.getElementById(id);
-        const unwrap = (value) => value?.data ?? value;
-        const notice = (text, error = false) => {
-          $("notice").textContent = text;
-          $("notice").className = error ? "error" : "";
-        };
-        const request = async (path, options = {}) => {
-          const response = await fetch(path, {
-            headers: { "Content-Type": "application/json" },
-            ...options,
-          });
-          if (!response.ok) {
-            const body = await response.text();
-            try {
-              const payload = JSON.parse(body);
-              const error = new Error(payload.message || `${response.status} request failed`);
-              error.code = payload.code;
-              throw error;
-            } catch (error) {
-              if (error instanceof SyntaxError) throw new Error(body || `${response.status} request failed`);
-              throw error;
-            }
-          }
-          if (response.status === 204) return null;
-          const payload = await response.json();
-          if (payload?.message) notice(payload.message, payload.success === false);
-          return payload;
-        };
-        const showPage = (page) => {
-          document
-            .querySelectorAll(".page")
-            .forEach((item) =>
-              item.classList.toggle("active", item.id === page),
-            );
-          document
-            .querySelectorAll(".nav button")
-            .forEach((item) =>
-              item.classList.toggle("active", item.dataset.page === page),
-            );
-          if (page === "servers") renderServerTable();
-          if (page === "commands") loadCommands();
-          if (page === "alerts") loadAlerts();
-          if (page === "sdui-admin") loadSduiActions();
-          if (page === "settings") loadSettings();
-        };
-        const loadSettings = async () => {
-          try {
-            state.paths = unwrap(await request("api/paths")) || [];
-            state.scripts = unwrap(await request("api/scripts")) || [];
-            const runtime = unwrap(await request("api/configuration/runtime"));
-            $("healthcheck-enabled").checked = Boolean(runtime.healthCheckEnabled);
-            $("service-management-enabled").checked = Boolean(runtime.serviceManagementEnabled);
-            $("alert-management-enabled").checked = Boolean(runtime.alertManagementEnabled);
-            $("health-status-population-enabled").checked = Boolean(runtime.healthStatusPopulationEnabled);
-            $("alerts-nav").hidden = !runtime.alertManagementEnabled;
-            $("healthcheck-cron").value = runtime.healthCheckCron || "";
-            $("runtime-config-status").textContent = "Loaded";
-            renderPaths();
-            renderScripts();
-          } catch (error) {
-            $("runtime-config-status").textContent = "Unavailable";
-            notice(error.message, true);
-          }
-        };
-        $("save-runtime-config").onclick = async () => {
-          try {
-            const runtime = unwrap(await request("api/configuration/runtime", {
-              method: "PUT",
-              body: JSON.stringify({
-                healthCheckEnabled: $("healthcheck-enabled").checked,
-                serviceManagementEnabled: $("service-management-enabled").checked,
-                alertManagementEnabled: $("alert-management-enabled").checked,
-                healthStatusPopulationEnabled: $("health-status-population-enabled").checked,
-              }),
-            }));
-            $("healthcheck-enabled").checked = Boolean(runtime.healthCheckEnabled);
-            $("service-management-enabled").checked = Boolean(runtime.serviceManagementEnabled);
-            $("alert-management-enabled").checked = Boolean(runtime.alertManagementEnabled);
-            $("health-status-population-enabled").checked = Boolean(runtime.healthStatusPopulationEnabled);
-            $("alerts-nav").hidden = !runtime.alertManagementEnabled;
-            $("runtime-config-status").textContent = "Saved";
-            notice("Runtime configuration saved.");
-          } catch (error) {
-            if (error.message.includes("SCRIPTS_UNAVAILABLE")) {
-              $("scripts-unavailable-message").textContent =
-                `Scripts are unavailable on server ${serverId}. Configure the required scripts on that server before running ${action} all.`;
-              $("scripts-unavailable-modal").classList.add("active");
-            }
-            notice(error.message, true);
-          }
-        };
-        const loadAlerts = async () => {
-          try {
-            state.alerts = await request("api/alerts") || [];
-            state.alertEvents = await request("api/alerts/events") || [];
-            renderAlerts();
-          } catch (error) { notice(error.message, true); }
-        };
-        const renderAlerts = () => {
-          $("alert-table").innerHTML = state.alerts.length ? state.alerts.map((alert) => {
-            const target = alert.targetType === "SERVER" ? state.servers.find((item) => item.id === alert.serverId)?.hostname || `Server #${alert.serverId}` : state.servers.flatMap((item) => item.services || []).find((item) => item.id === alert.serviceId)?.serviceName || `Service #${alert.serviceId}`;
-            return `<div class="service"><span><strong>${escapeHtml(alert.name)}</strong><small>${escapeHtml(alert.targetType)}: ${escapeHtml(target)} · ${escapeHtml(alert.conditionType)} ${escapeHtml(alert.operator)} ${escapeHtml(alert.conditionValue)}</small></span><span class="actions"><button class="btn secondary" data-alert-toggle="${alert.id}">${alert.enabled ? "Disable" : "Enable"}</button><button class="btn secondary" data-alert-edit="${alert.id}">Edit</button><button class="btn danger" data-alert-delete="${alert.id}">Delete</button></span></div>`;
-          }).join("") : "No alert rules configured.";
-          $("alert-events").innerHTML = state.alertEvents.length ? state.alertEvents.map((event) => `<div class="service"><span><strong>${escapeHtml(event.message)}</strong><small>${escapeHtml(event.triggeredDttm || "")} · server ${event.serverId ?? "-"} · service ${event.serviceId ?? "-"}</small></span></div>`).join("") : "No triggered alerts.";
-          document.querySelectorAll("[data-alert-edit]").forEach((button) => button.onclick = () => openAlert(Number(button.dataset.alertEdit)));
-          document.querySelectorAll("[data-alert-delete]").forEach((button) => button.onclick = () => deleteAlert(Number(button.dataset.alertDelete)));
-          document.querySelectorAll("[data-alert-toggle]").forEach((button) => button.onclick = () => toggleAlert(Number(button.dataset.alertToggle)));
-        };
-        const populateAlertTargets = () => {
-          $("alert-server").innerHTML = `<option value="">Select server</option>${state.servers.map((server) => `<option value="${server.id}">${escapeHtml(server.hostname || server.ipAddress)}</option>`).join("")}`;
-          $("alert-service").innerHTML = `<option value="">Select service</option>${state.servers.flatMap((server) => (server.services || []).map((service) => `<option value="${service.id}">${escapeHtml(service.serviceName)} (${escapeHtml(server.hostname || server.ipAddress)})</option>`)).join("")}`;
-        };
-        const openAlert = (id = null) => {
-          populateAlertTargets(); $("alert-form").reset(); $("alert-id").value = id || ""; $("alert-enabled").checked = true;
-          if (id) { const alert = state.alerts.find((item) => item.id === id); if (!alert) return notice("Alert not found.", true); Object.entries({"alert-name": alert.name, "alert-target-type": alert.targetType, "alert-server": alert.serverId || "", "alert-service": alert.serviceId || "", "alert-condition-type": alert.conditionType, "alert-operator": alert.operator, "alert-condition-value": alert.conditionValue}).forEach(([key, value]) => $(key).value = value); $("alert-enabled").checked = alert.enabled; }
-          toggleAlertTarget(); $("alert-modal").classList.add("active");
-        };
-        const toggleAlertTarget = () => { const server = $("alert-target-type").value === "SERVER"; $("alert-server").disabled = !server; $("alert-service").disabled = server; };
-        const deleteAlert = async (id) => { if (!window.confirm("Delete this alert?")) return; try { await request(`api/alerts/${id}`, { method: "DELETE" }); await loadAlerts(); } catch (error) { notice(error.message, true); } };
-        const toggleAlert = async (id) => { const alert = state.alerts.find((item) => item.id === id); if (!alert) return; try { await request(`api/alerts/${id}`, { method: "PUT", body: JSON.stringify({...alert, enabled: !alert.enabled}) }); await loadAlerts(); } catch (error) { notice(error.message, true); } };
-        const loadSduiActions = async () => {
-          try {
-            state.sduiActions = unwrap(await request("api/sdui/actions")) || [];
-            renderSduiActions();
-          } catch (error) { 
-            $("sdui-actions-table").textContent = "Unable to load screens."; 
-            notice(error.message, true); 
-          }
-        };
-        const renderSduiActions = () => {
-          const grouped = {};
-          state.sduiActions.forEach((action) => {
-            if (!grouped[action.viewContext]) grouped[action.viewContext] = [];
-            grouped[action.viewContext].push(action);
-          });
-          $("sdui-actions-table").innerHTML = Object.keys(grouped).length ? Object.entries(grouped).map(([context, actions]) => `
-            <div style="margin-bottom: 20px;">
-              <h3 style="margin: 0 0 12px; color: var(--muted); font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">${escapeHtml(context)}</h3>
-              ${actions.map((action) => `<div class="service"><span><strong>${escapeHtml(action.actionLabel)}</strong><small>${escapeHtml(action.actionEndpoint)} · ${escapeHtml(action.componentType)}</small></span><span class="actions"><button class="btn secondary" data-sdui-edit="${action.id}">Edit</button><button class="btn danger" data-sdui-delete="${action.id}">Delete</button></span></div>`).join("")}
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Server Host</h3>
+                <button class="close" data-close="server-modal">&times;</button>
             </div>
-          `).join("") : "No screen definitions configured.";
-          document.querySelectorAll("[data-sdui-edit]").forEach((button) => button.onclick = () => openSduiAction(Number(button.dataset.sduiEdit)));
-          document.querySelectorAll("[data-sdui-delete]").forEach((button) => button.onclick = () => deleteSduiAction(Number(button.dataset.sduiDelete)));
-        };
-        const openSduiAction = (id = null) => {
-          $("sdui-action-form").reset();
-          $("sdui-action-id").value = id || "";
-          $("sdui-component-type").value = "ACTION";
-          $("sdui-grid-span").value = "span-12";
-          if (id) {
-            const action = state.sduiActions.find((item) => item.id === id);
-            if (!action) return notice("Screen definition not found.", true);
-            $("sdui-view-context").value = action.viewContext || "";
-            $("sdui-action-label").value = action.actionLabel || "";
-            $("sdui-action-endpoint").value = action.actionEndpoint || "";
-            $("sdui-component-type").value = action.componentType || "ACTION";
-            $("sdui-sidebar-category").value = action.sidebarCategory || "";
-            $("sdui-panel-title").value = action.panelTitle || "";
-            $("sdui-grid-span").value = action.gridSpan || "span-12";
-            $("sdui-icon-class").value = action.iconClass || "";
-            $("sdui-component-config").value = typeof action.componentConfig === "string" ? action.componentConfig : JSON.stringify(action.componentConfig || {}, null, 2);
-            $("sdui-request-payload").value = typeof action.requestPayload === "string" ? action.requestPayload : JSON.stringify(action.requestPayload || {}, null, 2);
-          }
-          $("sdui-action-modal").classList.add("active");
-        };
-        const deleteSduiAction = async (id) => {
-          if (!window.confirm("Delete this screen definition?")) return;
-          try {
-            await request(`api/sdui/actions/${id}`, { method: "DELETE" });
-            await loadSduiActions();
-            notice("Screen definition deleted.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        $("add-sdui-action").onclick = () => openSduiAction();
-        $("refresh-sdui-actions").onclick = loadSduiActions;
-        $("sdui-action-form").onsubmit = async (event) => {
-          event.preventDefault();
-          const id = $("sdui-action-id").value;
-          try {
-            let componentConfig = {};
-            let requestPayload = {};
-            try {
-              const configText = $("sdui-component-config").value.trim();
-              if (configText) componentConfig = JSON.parse(configText);
-            } catch (e) {
-              return notice("Component Config must be valid JSON.", true);
-            }
-            try {
-              const payloadText = $("sdui-request-payload").value.trim();
-              if (payloadText) requestPayload = JSON.parse(payloadText);
-            } catch (e) {
-              return notice("Request Payload must be valid JSON.", true);
-            }
-            const body = {
-              viewContext: $("sdui-view-context").value.trim(),
-              actionLabel: $("sdui-action-label").value.trim(),
-              actionEndpoint: $("sdui-action-endpoint").value.trim(),
-              componentType: $("sdui-component-type").value,
-              componentConfig: componentConfig,
-              requestPayload: requestPayload,
-              sidebarCategory: $("sdui-sidebar-category").value.trim() || null,
-              panelTitle: $("sdui-panel-title").value.trim() || null,
-              gridSpan: $("sdui-grid-span").value,
-              iconClass: $("sdui-icon-class").value.trim() || null,
-            };
-            if (!body.viewContext || !body.actionLabel || !body.actionEndpoint) {
-              return notice("View Context, Action Label, and Action Endpoint are required.", true);
-            }
-            await request(id ? `api/sdui/actions/${id}` : "api/sdui/actions", {
-              method: id ? "PUT" : "POST",
-              body: JSON.stringify(body),
-            });
-            $("sdui-action-modal").classList.remove("active");
-            await loadSduiActions();
-            notice(id ? "Screen definition updated." : "Screen definition created.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        const renderPaths = () => {
-          $("path-table").innerHTML = state.paths.length
-            ? state.paths.map((path) => `<div class="service" data-path-id="${path.id}"><span><strong>${escapeHtml(path.pathName)}</strong><small>${escapeHtml(path.pathDescription || "")}</small></span><span class="actions"><button class="btn secondary" data-path-action="edit">Edit</button><button class="btn danger" data-path-action="delete">Delete</button></span></div>`).join("")
-            : "No paths configured.";
-          document.querySelectorAll("[data-path-action]").forEach((button) => {
-            const id = Number(button.closest("[data-path-id]").dataset.pathId);
-            button.onclick = () => button.dataset.pathAction === "edit" ? openPath(id) : deletePath(id);
-          });
-        };
-        const renderScripts = () => {
-          $("script-table").innerHTML = state.scripts.length
-            ? state.scripts.map((script) => `<div class="service" data-script-id="${script.id}"><span><strong>${escapeHtml(script.scriptName)}</strong><small>${escapeHtml(script.scriptExtension || "")}</small></span><span class="actions"><button class="btn secondary" data-script-action="edit">Edit</button><button class="btn danger" data-script-action="delete">Delete</button></span></div>`).join("")
-            : "No scripts configured.";
-          document.querySelectorAll("[data-script-action]").forEach((button) => {
-            const id = Number(button.closest("[data-script-id]").dataset.scriptId);
-            button.onclick = () => button.dataset.scriptAction === "edit" ? openScript(id) : deleteScript(id);
-          });
-        };
-        const openPath = (id = null) => {
-          $("path-crud-form").reset();
-          $("path-id").value = id || "";
-          $("path-server").innerHTML = state.servers.map((server) => `<option value="${server.id}">${escapeHtml(server.hostname || server.ipAddress)}</option>`).join("");
-          if (id) {
-            const path = state.paths.find((item) => item.id === id);
-            if (!path) return notice("Path not found.", true);
-            $("path-name").value = path.pathName || "";
-            $("path-description").value = path.pathDescription || "";
-          } else if (state.selected) $("path-server").value = state.selected.id;
-          $("path-modal").classList.add("active");
-        };
-        const openScript = (id = null) => {
-          $("script-crud-form").reset();
-          $("script-id").value = id || "";
-          if (id) {
-            const script = state.scripts.find((item) => item.id === id);
-            if (!script) return notice("Script not found.", true);
-            $("script-name").value = script.scriptName || "";
-            $("script-extension").value = script.scriptExtension || "SH";
-          }
-          $("script-modal").classList.add("active");
-        };
-        const deletePath = async (id) => {
-          if (!window.confirm("Delete this path?")) return;
-          try { await request(`api/paths/${id}`, { method: "DELETE" }); await loadSettings(); notice("Path deleted."); } catch (error) { notice(error.message, true); }
-        };
-        const deleteScript = async (id) => {
-          if (!window.confirm("Delete this script?")) return;
-          try { await request(`api/scripts/${id}`, { method: "DELETE" }); await loadSettings(); notice("Script deleted."); } catch (error) { notice(error.message, true); }
-        };
-        const renderCommands = (commands) => {
-          const commandSelect = $("command-select");
-          const selectedCommand = commandSelect.value;
-          commandSelect.innerHTML =
-            `<option value="">Custom command</option>${commands
-              .map(
-                (command) =>
-                  `<option value="${command.id}">${escapeHtml(command.description || command.name)}</option>`,
-              )
-              .join("")}`;
-          if (commands.some((command) => String(command.id) === selectedCommand)) {
-            commandSelect.value = selectedCommand;
-          }
-          $("command-table").innerHTML = commands.length
-            ? commands
-                .map(
-                  (command) =>
-                    `<div class="service" data-command-id="${command.id}"><span><strong>${escapeHtml(command.name)}</strong><small>${escapeHtml(command.description || "")}</small><small>Parameters: ${escapeHtml(command.parameters || "(none)")} · Status: ${escapeHtml(command.status || "UNKNOWN")}</small></span><span class="actions"><button class="btn secondary" data-command-action="edit">Edit</button><button class="btn danger" data-command-action="delete">Delete</button></span></div>`,
-                )
-                .join("")
-            : "No commands configured.";
-          document
-            .querySelectorAll("[data-command-action]")
-            .forEach((button) => {
-              const commandId = Number(
-                button.closest("[data-command-id]").dataset.commandId,
-              );
-              button.onclick = () =>
-                button.dataset.commandAction === "edit"
-                  ? openCommand(commandId)
-                  : deleteCommand(commandId);
-            });
-        };
-        const loadCommands = async () => {
-          try {
-            const commands = unwrap(await request("api/commands")) || [];
-            state.commands = commands;
-            renderCommands(commands);
-          } catch (error) {
-            $("command-table").textContent = "Unable to load commands.";
-            notice(error.message, true);
-          }
-        };
-        const openCommand = (id = null) => {
-          $("command-crud-form").reset();
-          $("command-id").value = id || "";
-          if (id) {
-            const command = state.commands.find((item) => item.id === id);
-            if (!command) return notice("Command not found.", true);
-            $("command-name").value = command.name || "";
-            $("command-description").value = command.description || "";
-            $("command-parameters").value = command.parameters || "";
-            $("command-status").value = command.status || "CREATED";
-            $("command-result").value = command.result || "";
-          } else {
-            $("command-status").value = "CREATED";
-          }
-          $("command-modal").classList.add("active");
-        };
-        const deleteCommand = async (id) => {
-          if (!window.confirm("Delete this command?")) return;
-          try {
-            await request(`api/commands/${id}`, { method: "DELETE" });
-            await loadCommands();
-            notice("Command deleted.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        const renderServers = () => {
-          const options = state.servers
-            .map(
-              (server) =>
-                `<option value="${server.id}">${escapeHtml(server.hostname || server.ipAddress)}</option>`,
-            )
-            .join("");
-          $("server-select").innerHTML =
-            `<option value="">-- Select a server --</option>${options}`;
-          $("service-server").innerHTML =
-            `<option value="">-- Select a server --</option>${options}`;
-          $("server-list")?.replaceChildren();
-          renderServerTable();
-        };
-        const renderServerTable = () => {
-          $("server-table").innerHTML =
-            state.servers
-              .map(
-                (server) =>
-                  `<div class="service"><span><strong>${escapeHtml(server.hostname || server.ipAddress)}</strong><small>${escapeHtml(server.ipAddress || "")} · ${escapeHtml(server.status || "UNKNOWN")}</small></span><span class="actions"><button class="btn secondary" data-server="${server.id}">Select</button><button class="btn secondary" data-edit-server="${server.id}">Edit</button><button class="btn secondary" data-delete-server="${server.id}">Delete</button></span></div>`,
-              )
-              .join("") || "No servers configured.";
-          document
-            .querySelectorAll("[data-server]")
-            .forEach(
-              (button) =>
-                (button.onclick = () =>
-                  selectServer(Number(button.dataset.server))),
-            );
-          document.querySelectorAll("[data-edit-server]").forEach(
-            (button) =>
-              (button.onclick = () => openServer(Number(button.dataset.editServer))),
-          );
-          document.querySelectorAll("[data-delete-server]").forEach(
-            (button) =>
-              (button.onclick = () => deleteServer(Number(button.dataset.deleteServer))),
-          );
-        };
-        const deleteServer = async (id) => {
-          if (!window.confirm("Delete this server?")) return;
-          try {
-            await request(`api/servers/${id}`, { method: "DELETE" });
-            if (state.selected?.id === id) state.selected = null;
-            await loadServers();
-            $("service-list").textContent = "Select a server to load services.";
-            notice("Server deleted.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        const loadServers = async () => {
-          try {
-            state.servers = unwrap(await request("api/servers")) || [];
-            renderServers();
-            if (state.selected) await selectServer(state.selected.id);
-            notice(`${state.servers.length} server(s) loaded.`);
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        const selectServer = async (id) => {
-          state.selected =
-            state.servers.find((server) => server.id === id) || null;
-          $("server-select").value = state.selected?.id || "";
-          if (!state.selected) return;
-          try {
-            const persisted = unwrap(await request(`api/service-health-status/server/${id}`)) || [];
-            state.healthStatuses = Object.fromEntries(persisted.map((item) => [item.service?.id, item.status]));
-          } catch {
-            state.healthStatuses = {};
-          }
-          try {
-            state.serverServiceConfigurations = unwrap(
-              await request(`api/server-service-configurations/server/${id}`),
-            ) || [];
-          } catch {
-            state.serverServiceConfigurations = [];
-          }
-          $("selected-title").textContent =
-            state.selected.hostname || state.selected.ipAddress;
-          $("selected-meta").textContent =
-            `${state.selected.ipAddress || ""} · ${state.selected.osType || "Linux"}`;
-          await loadServices();
-          renderServers();
-        };
-        const updateServiceRuntime = async (service) => {
-          const version = $(`version-${service.id}`);
-          const indicator = $(`indicator-${service.id}`);
-          if (!service.healthCheckUrl) return;
-          const baseUrl = service.healthCheckUrl.replace(
-            /\/actuator\/health$/,
-            "",
-          );
-          try {
-            const health = await fetch(`${baseUrl}/actuator/health`);
-            indicator.className = `status ${health.ok ? "" : "offline"}`;
-            indicator.style = health.ok ? "" : "";
-            indicator.textContent = health.ok ? "ONLINE" : "OFFLINE";
-            const info = await fetch(`${baseUrl}/actuator/info`);
-            if (info.ok) {
-              const payload = await info.json();
-              version.textContent =
-                payload?.build?.version ||
-                payload?.build?.project?.version ||
-                "Unknown";
-            } else {
-              version.textContent = "Unknown";
-            }
-          } catch {
-            indicator.className = "status offline";
-            indicator.style = "";
-            indicator.textContent = "OFFLINE";
-            version.textContent = "Unknown";
-          }
-        };
-        const loadServices = async () => {
-          if (!state.selected) return;
-          const services = state.selected.services || [];
-          const serviceUrl = (service) =>
-            state.serverServiceConfigurations.find(
-              (configuration) => configuration.serviceId === service.id,
-            )?.healthCheckUrl || "";
-          const showBulkActions = services.length > 1;
-          ["start-all-services", "stop-all-services", "restart-all-services"].forEach(
-            (buttonId) => ($(buttonId).hidden = !showBulkActions),
-          );
-          $("service-list").innerHTML = services.length
-            ? services
-                .map(
-                  (service) =>
-                    `<div class="service" data-service-id="${service.id}"><span><strong>${escapeHtml(service.serviceName)}</strong><small>${escapeHtml(serviceUrl(service))}</small><small>Version: <span id="version-${service.id}">Unknown</span> · <span id="indicator-${service.id}" class="status ${state.healthStatuses[service.id] === "UP" ? "" : state.healthStatuses[service.id] === "DOWN" ? "offline" : "unknown"}" style="${state.healthStatuses[service.id] ? "" : "background:#edf0f2;color:#64717d"}">${escapeHtml(state.healthStatuses[service.id] || "UNKNOWN")}</span></small></span><span class="actions"><button class="btn" data-action="start">Start</button><button class="btn secondary" data-action="stop">Stop</button><button class="btn secondary" data-action="logs">Logs</button><button class="btn secondary" data-edit-service="${service.id}">Edit</button><button class="btn secondary" data-delete-service="${service.id}">Delete</button></span></div>`,
-                )
-                .join("")
-            : "No services are attached to this server.";
-          document
-            .querySelectorAll("[data-action]")
-            .forEach(
-              (button) =>
-                (button.onclick = () =>
-                  serviceAction(
-                    button.dataset.action,
-                    Number(
-                      button.closest("[data-service-id]").dataset.serviceId,
-                    ),
-                  )),
-            );
-          document.querySelectorAll("[data-edit-service]").forEach(
-            (button) =>
-              (button.onclick = () => openService(Number(button.dataset.editService))),
-          );
-          document.querySelectorAll("[data-delete-service]").forEach(
-            (button) =>
-              (button.onclick = () => deleteService(Number(button.dataset.deleteService))),
-          );
-          services.forEach((service) =>
-            updateServiceRuntime({ ...service, healthCheckUrl: serviceUrl(service) }),
-          );
-        };
-        const deleteService = async (id) => {
-          if (!window.confirm("Delete this service?")) return;
-          try {
-            await request(`api/services/${id}`, { method: "DELETE" });
-            await loadServers();
-            await selectServer(state.selected.id);
-            notice("Service deleted.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        const closeLogStream = () => {
-          if (!currentLogStream) return;
-          currentLogStream.close();
-          currentLogStream = null;
-        };
-        const closeServiceActionStream = () => {
-          if (!currentServiceActionStream) return;
-          currentServiceActionStream.close();
-          currentServiceActionStream = null;
-        };
-        window.addEventListener("pagehide", closeLogStream);
-        window.addEventListener("beforeunload", closeLogStream);
-        const streamLogs = (serviceId) => {
-          closeLogStream();
-          const logsOutputEl = $("logs-output");
-          logsOutputEl.textContent = "Connecting...\n";
-          $("logs-modal").classList.add("active");
-          currentLogStream = new EventSource(
-            `api/logs/stream?serverId=${state.selected.id}&serviceId=${serviceId}`,
-          );
-          currentLogStream.addEventListener("log", (event) => {
-            const lines = (logsOutputEl.textContent + event.data + "\n").split(
-              "\n",
-            );
-            logsOutputEl.textContent = lines.slice(-1001).join("\n");
-            logsOutputEl.scrollTop = logsOutputEl.scrollHeight;
-          });
-          currentLogStream.onerror = () => {
-            currentLogStream.close();
-            currentLogStream = null;
-            if (logsOutputEl.textContent === "Connecting...\n") {
-              logsOutputEl.textContent = "Unable to stream logs.";
-            }
-            notice("Log stream disconnected.", true);
-          };
-          notice("Log stream connected.");
-        };
-        const serviceAction = async (action, serviceId) => {
-          if (action === "logs") {
-            streamLogs(serviceId);
-            return;
-          }
-          try {
-            const route = `api/manage-services/${action}-service`;
+            <form id="server-form">
+                <input type="hidden" id="server-id">
+                <label for="hostname">Server Name / Hostname *</label>
+                <input id="hostname" required placeholder="prod-web-01">
+                <label for="ip-address">IP Address or DNS *</label>
+                <input id="ip-address" required placeholder="192.168.1.100">
+                <label for="os-type">Operating System</label>
+                <input id="os-type" value="Linux">
+                <label for="server-status">Status</label>
+                <select id="server-status">
+                    <option value="ONLINE">ONLINE</option>
+                    <option value="OFFLINE">OFFLINE</option>
+                    <option value="UNKNOWN">UNKNOWN</option>
+                </select>
+                <div class="modal-footer">
+                    <button type="button" class="btn secondary" data-close="server-modal">Cancel</button>
+                    <button class="btn" type="submit">Save Server</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            const response = await request(
-              `${route}?serverId=${state.selected.id}&serviceId=${serviceId}`,
-              { method: "POST" },
-            );
+    <!-- Service Modal -->
+    <div class="modal" id="service-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Service Application</h3>
+                <button class="close" data-close="service-modal">&times;</button>
+            </div>
+            <form id="service-form">
+                <input type="hidden" id="service-id">
+                <label for="service-server">Target Server *</label>
+                <select id="service-server" required></select>
+                <label for="service-name">Service Identifier / Name *</label>
+                <input id="service-name" required placeholder="auth-service">
+                <label for="service-type">Service Framework / Type</label>
+                <select id="service-type">
+                    <option value="SPRING_BOOT">Spring Boot (Actuator)</option>
+                    <option value="OTHER">Other Service</option>
+                </select>
+                <div id="spring-boot-fields">
+                    <label for="actuator-port">Actuator HTTP Port</label>
+                    <input id="actuator-port" type="number" value="8080" min="1" max="65535">
+                    <label for="context-path">Servlet Context Path</label>
+                    <input id="context-path" placeholder="/auth">
+                </div>
+                <label for="logs-path">LOGS Directory Path</label>
+                <input id="logs-path" placeholder="/opt/apps/logs">
+                <label for="scripts-path">Lifecycle Scripts Directory Path</label>
+                <input id="scripts-path" placeholder="/opt/apps/scripts">
+                <div class="modal-footer">
+                    <button type="button" class="btn secondary" data-close="service-modal">Cancel</button>
+                    <button class="btn" type="submit">Save Service</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            const unwrappedResponse = unwrap(response);
+    <!-- Command Modal -->
+    <div class="modal" id="command-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>SSH Command</h3>
+                <button class="close" data-close="command-modal">&times;</button>
+            </div>
+            <form id="command-crud-form">
+                <input type="hidden" id="command-id">
+                <label for="command-name">Command Name *</label>
+                <input id="command-name" required placeholder="Check Disk Space">
+                <label for="command-parameters">Command String / Parameters *</label>
+                <input id="command-parameters" required placeholder="df -h">
+                <label for="command-description">Description</label>
+                <input id="command-description" placeholder="Checks disk partition usage">
+                <input type="hidden" id="command-status" value="CREATED">
+                <input type="hidden" id="command-result">
+                <div class="modal-footer">
+                    <button type="button" class="btn secondary" data-close="command-modal">Cancel</button>
+                    <button class="btn" type="submit">Save Command</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            // 1. START AGGRESSIVE PARSING
-            let currentData =
-              unwrappedResponse.payload ||
-              unwrappedResponse.data?.payload ||
-              unwrappedResponse;
+    <!-- Alert Rule Modal -->
+    <div class="modal" id="alert-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Alert Rule</h3>
+                <button class="close" data-close="alert-modal">&times;</button>
+            </div>
+            <form id="alert-form">
+                <input type="hidden" id="alert-id">
+                <label for="alert-name">Rule Name *</label>
+                <input id="alert-name" required placeholder="Web Server Down">
+                <label for="alert-target-type">Target Scope *</label>
+                <select id="alert-target-type">
+                    <option value="SERVER">Server</option>
+                    <option value="SERVICE">Service</option>
+                </select>
+                <div id="alert-server-group">
+                    <label for="alert-server">Server Target</label>
+                    <select id="alert-server"></select>
+                </div>
+                <div id="alert-service-group" style="display: none;">
+                    <label for="alert-service">Service Target</label>
+                    <select id="alert-service"></select>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label for="alert-condition-type">Condition Type</label>
+                        <select id="alert-condition-type">
+                            <option value="SERVICE_STATUS">SERVICE_STATUS</option>
+                            <option value="HTTP_STATUS">HTTP_STATUS</option>
+                            <option value="RESPONSE_TIME">RESPONSE_TIME</option>
+                            <option value="RESOURCE_USAGE">RESOURCE_USAGE</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="alert-operator">Operator</label>
+                        <select id="alert-operator">
+                            <option value="EQUALS">EQUALS (=)</option>
+                            <option value="NOT_EQUALS">NOT_EQUALS (!=)</option>
+                            <option value="GREATER_THAN">GREATER_THAN (&gt;)</option>
+                            <option value="LESS_THAN">LESS_THAN (&lt;)</option>
+                        </select>
+                    </div>
+                </div>
+                <label for="alert-condition-value">Threshold / Target Value *</label>
+                <input id="alert-condition-value" required placeholder="DOWN or 500">
+                <label class="checkbox-field">
+                    <input type="checkbox" id="alert-enabled" checked> Enable rule immediately
+                </label>
+                <div class="modal-footer">
+                    <button type="button" class="btn secondary" data-close="alert-modal">Cancel</button>
+                    <button class="btn" type="submit">Save Rule</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            // Keep parsing as long as it's a string (handles double/triple-wrapped JSON)
-            while (typeof currentData === "string") {
-              try {
-                currentData = JSON.parse(currentData);
-              } catch {
-                break; // Stop parsing when it's just normal text
-              }
-            }
+    <!-- Log Alert Event Modal -->
+    <div class="modal" id="log-event-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Log New Alert Event</h3>
+                <button class="close" data-close="log-event-modal">&times;</button>
+            </div>
+            <form id="log-event-form">
+                <label for="event-log-alert-id">Alert Rule ID *</label>
+                <input id="event-log-alert-id" type="number" required placeholder="1">
+                <label for="event-log-server">Server Context (Optional)</label>
+                <select id="event-log-server"></select>
+                <label for="event-log-service-id">Service ID (Optional)</label>
+                <input id="event-log-service-id" type="number" placeholder="Optional service ID">
+                <label for="event-log-condition">Trigger Condition *</label>
+                <input id="event-log-condition" required placeholder="SERVICE_DOWN or CPU_HIGH">
+                <label for="event-log-status">Alert Status *</label>
+                <select id="event-log-status">
+                    <option value="TRIGGERED">TRIGGERED</option>
+                    <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+                    <option value="RESOLVED">RESOLVED</option>
+                </select>
+                <label for="event-log-message">Alert Message *</label>
+                <textarea id="event-log-message" required placeholder="Service unreachable after 3 consecutive health checks"></textarea>
+                <div class="modal-footer">
+                    <button type="button" class="btn secondary" data-close="log-event-modal">Cancel</button>
+                    <button class="btn" type="submit">Log Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            // 2. EXTRACT OUTPUT
-            let finalOutputText = "";
-            if (currentData && currentData.output) {
-              finalOutputText = currentData.output;
-            } else if (typeof currentData === "object") {
-              finalOutputText = JSON.stringify(currentData, null, 2);
-            } else {
-              finalOutputText = String(currentData);
-            }
+    <!-- Add Condition Mapping Modal -->
+    <div class="modal" id="mapping-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Condition Mapping</h3>
+                <button class="close" data-close="mapping-modal">&times;</button>
+            </div>
+            <form id="mapping-form">
+                <label for="mapping-key">Condition Key *</label>
+                <input id="mapping-key" required placeholder="e.g., DOWN, HTTP-500, SLOW">
+                <label for="mapping-value">Condition Value *</label>
+                <input id="mapping-value" required placeholder="e.g., Service is offline, 500ms">
+                <label for="mapping-desc">Description</label>
+                <input id="mapping-desc" placeholder="Human readable explanation">
+                <div class="modal-footer">
+                    <button type="button" class="btn secondary" data-close="mapping-modal">Cancel</button>
+                    <button class="btn" type="submit">Create Mapping</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            // 3. FORCE REAL NEWLINES
-            if (typeof finalOutputText === "string") {
-              finalOutputText = finalOutputText
-                .replace(/\\\\n/g, "\n") // Fix double-escaped newlines
-                .replace(/\\n/g, "\n") // Fix single-escaped newlines
-                .replace(/\\\\r/g, "") // Clean up carriage returns
-                .replace(/\\r/g, "")
-                .replace(/^"|"$/g, ""); // Strip leftover wrapping quotes
-            }
-            // END AGGRESSIVE PARSING
+    <!-- Path Modal -->
+    <div class="modal" id="path-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Server Path</h3>
+                <button class="close" data-close="path-modal">&times;</button>
+            </div>
+            <form id="path-crud-form">
+                <input type="hidden" id="path-id">
+                <label for="path-server">Target Server *</label>
+                <select id="path-server" required></select>
+                <label for="path-name">Path Identifier Name *</label>
+                <input id="path-name" required placeholder="LOGS_HOME">
+                <label for="path-description">Directory Location / Description *</label>
+                <input id="path-description" required placeholder="/opt/service/logs">
+                <div class="modal-footer">
+                    <button type="button" class="btn secondary" data-close="path-modal">Cancel</button>
+                    <button class="btn" type="submit">Save Path</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            // Apply to DOM
-            const outputEl = $("output");
-            if (outputEl) {
-              outputEl.textContent = finalOutputText;
-            }
+    <!-- Script Modal -->
+    <div class="modal" id="script-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Execution Script</h3>
+                <button class="close" data-close="script-modal">&times;</button>
+            </div>
+            <form id="script-crud-form">
+                <input type="hidden" id="script-id">
+                <label for="script-name">Script Name *</label>
+                <input id="script-name" required placeholder="start.sh">
+                <label for="script-extension">Script Type / Extension</label>
+                <select id="script-extension">
+                    <option value="SH">Shell Script (.sh)</option>
+                    <option value="BASH">Bash Script (.bash)</option>
+                    <option value="PY">Python (.py)</option>
+                </select>
+                <div class="modal-footer">
+                    <button type="button" class="btn secondary" data-close="script-modal">Cancel</button>
+                    <button class="btn" type="submit">Save Script</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            notice(`${action} request completed.`);
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        const bulkServiceAction = async (action) => {
-          if (!state.selected) return notice("Select a server first.", true);
-          const serverId = state.selected.id;
-          const bulkButtons = [
-            $("start-all-services"),
-            $("stop-all-services"),
-            $("restart-all-services"),
-          ];
-          bulkButtons.forEach((button) => (button.disabled = true));
-          closeServiceActionStream();
-          const outputEl = $("output");
-          outputEl.textContent = `Running ${action} all on server ${serverId}...\n`;
-          currentServiceActionStream = new EventSource(
-            `api/manage-services/${action}-all-service/stream?serverId=${serverId}`,
-          );
-          currentServiceActionStream.addEventListener("output", (event) => {
-            outputEl.textContent += `${event.data}\n`;
-            outputEl.scrollTop = outputEl.scrollHeight;
-          });
-          currentServiceActionStream.addEventListener("complete", async () => {
-            closeServiceActionStream();
-            await loadServers();
-            notice(`${action} all request completed for server ${serverId}.`);
-            bulkButtons.forEach((button) => (button.disabled = false));
-          });
-          currentServiceActionStream.addEventListener("error", (event) => {
-            const message = event.data || "Lifecycle script execution failed.";
-            if (message.includes("SCRIPTS_UNAVAILABLE")) {
-              $("scripts-unavailable-message").textContent =
-                `Scripts are unavailable on server ${serverId}. Configure the required scripts on that server before running ${action} all.`;
-              $("scripts-unavailable-modal").classList.add("active");
-            }
-            outputEl.textContent += `${message}\n`;
-            notice(message, true);
-            closeServiceActionStream();
-            bulkButtons.forEach((button) => (button.disabled = false));
-          });
-          currentServiceActionStream.onerror = () => {
-            if (!currentServiceActionStream) return;
-            closeServiceActionStream();
-            notice("Lifecycle script stream disconnected.", true);
-            bulkButtons.forEach((button) => (button.disabled = false));
-          };
-        };
-        $("server-select").onchange = (event) =>
-          selectServer(Number(event.target.value));
-        $("refresh-services").onclick = loadServices;
-        $("start-all-services").onclick = () => bulkServiceAction("start");
-        $("stop-all-services").onclick = () => bulkServiceAction("stop");
-        $("restart-all-services").onclick = () => bulkServiceAction("restart");
-        $("command-form").onsubmit = async (event) => {
-          event.preventDefault();
-          if (!state.selected) return notice("Select a server first.", true);
-          try {
-            const response = await request(
-              `api/commands/execute?serverId=${state.selected.id}&command=${encodeURIComponent($("command").value)}`,
-              { method: "POST" },
-            );
-            $("output").textContent = JSON.stringify(unwrap(response), null, 2);
-            notice("Command completed.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        $("command-select").onchange = (event) => {
-          const command = state.commands.find(
-            (item) => String(item.id) === event.target.value,
-          );
-          $("command").value = command
-            ? [command.name, command.parameters].filter(Boolean).join(" ")
-            : "";
-        };
-        $("add-command").onclick = () => openCommand();
-        $("refresh-commands").onclick = loadCommands;
-        $("command-crud-form").onsubmit = async (event) => {
-          event.preventDefault();
-          const id = $("command-id").value;
-          const body = {
-            name: $("command-name").value.trim(),
-            description: $("command-description").value.trim(),
-            parameters: $("command-parameters").value.trim(),
-            status: $("command-status").value,
-            result: $("command-result").value,
-            createdDttm: null,
-            lastUpdatedDttm: null,
-            createdSource: "UI",
-            lastUpdatedSource: "UI",
-          };
-          try {
-            await request(id ? `api/commands/${id}` : "api/commands", {
-              method: id ? "PUT" : "POST",
-              body: JSON.stringify(body),
-            });
-            $("command-modal").classList.remove("active");
-            await loadCommands();
-            notice(id ? "Command updated." : "Command created.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        const openServer = (id = null) => {
-          $("server-form").reset();
-          $("server-id").value = id || "";
-          $("os-type").value = "Linux";
-          if (id) {
-            const server = state.servers.find((item) => item.id === id);
-            if (!server) return notice("Server not found.", true);
-            $("hostname").value = server.hostname || "";
-            $("ip-address").value = server.ipAddress || "";
-            $("os-type").value = server.osType || "Linux";
-            $("server-status").value = server.status || "UNKNOWN";
-          }
-          $("server-modal").classList.add("active");
-        };
-        $("add-server").onclick = openServer;
-        $("add-server-page").onclick = openServer;
-        $("server-form").onsubmit = async (event) => {
-          event.preventDefault();
-          const id = $("server-id").value;
-          const body = {
-            id: id ? Number(id) : null,
-            hostname: $("hostname").value,
-            ipAddress: $("ip-address").value,
-            osType: $("os-type").value,
-            status: $("server-status").value,
-            paths: [],
-            services: [],
-            createdSource: "UI",
-            lastUpdatedSource: "UI",
-          };
-          try {
-            await request(id ? `api/servers/${id}` : "api/servers", {
-              method: id ? "PUT" : "POST",
-              body: JSON.stringify(body),
-            });
-            if (id) {
-              await syncServiceHealthUrls(
-                state.servers.find((server) => server.id === Number(id)),
-                body,
-              );
-            }
-            $("server-modal").classList.remove("active");
-            await loadServers();
-            notice("Server saved.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        const openService = async (id = null) => {
-          if (!state.selected) return notice("Select a server first.", true);
-          const service = id
-            ? state.selected.services?.find((item) => item.id === id)
-            : null;
-          if (id && !service) return notice("Service not found.", true);
-          try {
-            state.paths = unwrap(await request("api/paths")) || [];
-          } catch (error) {
-            return notice(`Unable to load configured paths: ${error.message}`, true);
-          }
-          $("service-form").reset();
-          $("service-id").value = id || "";
-          $("service-server").value = state.selected.id;
-          if (service) {
-            $("service-name").value = service.serviceName || "";
-            const configuration = state.serverServiceConfigurations.find(
-              (item) => item.serviceId === service.id,
-            );
-            const healthCheckUrl = configuration?.healthCheckUrl || "";
-            $("service-type").value = healthCheckUrl ? "SPRING_BOOT" : "OTHER";
-            const serverPaths = state.paths.filter((path) =>
-              path.servers?.some((pathServer) => Number(pathServer.id) === Number(state.selected.id)),
-            );
-            const paths = serverPaths.length ? serverPaths : state.selected.paths || [];
-            const logsPath = paths.find((path) => path.pathName === "LOGS_HOME");
-            const scriptsPath = paths.find((path) => path.pathName === "SCRIPTS_HOME");
-            $("logs-path").value = logsPath?.pathDescription || "";
-            $("scripts-path").value = scriptsPath?.pathDescription || "";
-            if (healthCheckUrl) {
-              try {
-                const url = new URL(healthCheckUrl);
-                $("actuator-port").value = url.port || "80";
-                $("context-path").value = url.pathname.replace(/\/actuator\/health\/?$/, "");
-              } catch {
-                $("actuator-port").value = "8080";
-                $("context-path").value = "";
-              }
-            }
-          }
-          $("spring-boot-fields").style.display =
-            $("service-type").value === "SPRING_BOOT" ? "block" : "none";
-          $("service-modal").classList.add("active");
-        };
-        $("add-service").onclick = () => {
-          if (!state.selected) return notice("Select a server first.", true);
-          openService();
-        };
-        $("service-type").onchange = (event) => {
-          $("spring-boot-fields").style.display =
-            event.target.value === "SPRING_BOOT" ? "block" : "none";
-        };
-        const actuatorBaseUrl = (server, port, contextPath) => {
-          const host = server.ipAddress || server.hostname;
-          const context = (contextPath || "").trim().replace(/^\/+|\/+$/g, "");
-          return `http://${host}:${port}${context ? `/${context}` : ""}`;
-        };
-        const servicePayload = (service, server, healthCheckUrl) => ({
-          ...service,
-          servers: [server],
-          healthCheckUrl,
-          createdDttm: null,
-          lastUpdatedDttm: null,
-        });
-        const syncServiceHealthUrls = async (previousServer, updatedServer) => {
-          for (const configuration of state.serverServiceConfigurations || []) {
-            if (!configuration.healthCheckUrl) continue;
-            const service = (previousServer?.services || []).find(
-              (item) => Number(item.id) === Number(configuration.serviceId),
-            );
-            if (!service) continue;
-            const url = new URL(configuration.healthCheckUrl);
-            const host = updatedServer.ipAddress || updatedServer.hostname;
-            const healthCheckUrl = `${url.protocol}//${host}${url.port ? `:${url.port}` : ""}${url.pathname}`;
-            await request(`api/services/${service.id}`, {
-              method: "PUT",
-              body: JSON.stringify(servicePayload(service, updatedServer, healthCheckUrl)),
-            });
-          }
-        };
-        const createPath = async (server, pathName, pathValue) => {
-          if (!pathValue.trim()) return;
-          const serverRequest = {
-            id: server.id,
-            hostname: server.hostname,
-            ipAddress: server.ipAddress,
-            osType: server.osType,
-            status: server.status,
-            lastHealthChecked: null,
-            paths: [],
-            services: [],
-            createdDttm: null,
-            lastUpdatedDttm: null,
-            createdSource: "UI",
-            lastUpdatedSource: "UI",
-          };
-          await request("api/paths", {
-            method: "POST",
-            body: JSON.stringify({
-              id: null,
-              pathName,
-              pathDescription: pathValue.trim(),
-              servers: [serverRequest],
-              scripts: [],
-              createdDttm: null,
-              lastUpdatedDttm: null,
-              createdSource: "UI",
-              lastUpdatedSource: "UI",
-            }),
-          });
-        };
-        $("service-form").onsubmit = async (event) => {
-          event.preventDefault();
-          const server = state.servers.find(
-            (item) => item.id === Number($("service-server").value),
-          );
-          if (!server) return notice("Select a server first.", true);
-          const body = {
-            id: $("service-id").value ? Number($("service-id").value) : null,
-            servers: [server],
-            serviceName: $("service-name").value,
-            healthCheckUrl:
-              $("service-type").value === "SPRING_BOOT"
-                ? actuatorBaseUrl(
-                    server,
-                    Number($("actuator-port").value || 8080),
-                    $("context-path").value,
-                  ) + "/actuator/health"
-                : "",
-            createdDttm: null,
-            lastUpdatedDttm: null,
-            createdSource: "UI",
-            lastUpdatedSource: "UI",
-          };
-          try {
-            const id = $("service-id").value;
-            await request(id ? `api/services/${id}` : "api/services", {
-              method: id ? "PUT" : "POST",
-              body: JSON.stringify(body),
-            });
-            await createPath(server, "LOGS_HOME", $("logs-path").value);
-            await createPath(server, "SCRIPTS_HOME", $("scripts-path").value);
-            $("service-modal").classList.remove("active");
-            await loadServers();
-            await selectServer(server.id);
-            notice("Service saved.");
-          } catch (error) {
-            notice(error.message, true);
-          }
-        };
-        $("add-path").onclick = () => openPath();
-        $("add-script").onclick = () => openScript();
-        $("path-crud-form").onsubmit = async (event) => {
-          event.preventDefault();
-          const server = state.servers.find((item) => item.id === Number($("path-server").value));
-          if (!server) return notice("Select a server first.", true);
-          const id = $("path-id").value;
-          const body = { id: id ? Number(id) : null, pathName: $("path-name").value, pathDescription: $("path-description").value, servers: [server], scripts: [], createdDttm: null, lastUpdatedDttm: null, createdSource: "UI", lastUpdatedSource: "UI" };
-          try { await request(id ? `api/paths/${id}` : "api/paths", { method: id ? "PUT" : "POST", body: JSON.stringify(body) }); $("path-modal").classList.remove("active"); await loadSettings(); notice("Path saved."); } catch (error) { notice(error.message, true); }
-        };
-        $("script-crud-form").onsubmit = async (event) => {
-          event.preventDefault();
-          const id = $("script-id").value;
-          const body = { id: id ? Number(id) : null, scriptName: $("script-name").value, scriptExtension: $("script-extension").value, paths: [], createdDttm: null, lastUpdatedDttm: null, createdSource: "UI", lastUpdatedSource: "UI" };
-          try { await request(id ? `api/scripts/${id}` : "api/scripts", { method: id ? "PUT" : "POST", body: JSON.stringify(body) }); $("script-modal").classList.remove("active"); await loadSettings(); notice("Script saved."); } catch (error) { notice(error.message, true); }
-        };
-        $("add-alert").onclick = () => openAlert();
-        $("refresh-alerts").onclick = () => loadAlerts();
-        $("alert-target-type").onchange = toggleAlertTarget;
-        $("alert-form").onsubmit = async (event) => {
-          event.preventDefault();
-          const id = $("alert-id").value;
-          const serverTarget = $("alert-target-type").value === "SERVER";
-          const body = { name: $("alert-name").value, targetType: $("alert-target-type").value, serverId: serverTarget ? Number($("alert-server").value) : null, serviceId: serverTarget ? null : Number($("alert-service").value), conditionType: $("alert-condition-type").value, operator: $("alert-operator").value, conditionValue: $("alert-condition-value").value, enabled: $("alert-enabled").checked };
-          try { await request(id ? `api/alerts/${id}` : "api/alerts", { method: id ? "PUT" : "POST", body: JSON.stringify(body) }); $("alert-modal").classList.remove("active"); await loadAlerts(); } catch (error) { notice(error.message, true); }
-        };
-        document.querySelectorAll("[data-close]").forEach(
-          (button) =>
-            (button.onclick = () => {
-              if (button.dataset.close === "logs-modal") closeLogStream();
-              $(button.dataset.close).classList.remove("active");
-            }),
-        );
-        document
-          .querySelectorAll(".nav button")
-          .forEach(
-            (button) => (button.onclick = () => showPage(button.dataset.page)),
-          );
-        const escapeHtml = (value) =>
-          String(value ?? "").replace(
-            /[&<>"']/g,
-            (character) =>
-              ({
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;",
-              })[character],
-          );
-        loadServers();
-        loadCommands();
-      })();
-    </script>
-  </body>
+    <!-- Logs Modal -->
+    <div class="modal" id="logs-modal">
+        <div class="modal-content" style="max-width: 780px;">
+            <div class="modal-header">
+                <h3>Live Service Log Stream</h3>
+                <button class="close" data-close="logs-modal">&times;</button>
+            </div>
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <div class="terminal-title">
+                        <span>TAIL -F // SERVICE LOGS</span>
+                    </div>
+                </div>
+                <pre id="logs-output" class="terminal-body" style="min-height: 380px;">Connecting to log stream...</pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn secondary" data-close="logs-modal" type="button">Close Stream</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Application Infrastructure -->
+    <script src="js/config.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/router.js"></script>
+
+    <!-- Page Modules -->
+    <script src="js/pages/servers.js"></script>
+    <script src="js/pages/dashboard.js"></script>
+    <script src="js/pages/services.js"></script>
+    <script src="js/pages/commands.js"></script>
+    <script src="js/pages/alerts.js"></script>
+    <script src="js/pages/logs.js"></script>
+    <script src="js/pages/settings.js"></script>
+
+    <!-- Application Bootstrap -->
+    <script src="js/main.js"></script>
+</body>
 </html>

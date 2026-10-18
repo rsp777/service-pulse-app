@@ -24,15 +24,18 @@ public class LogsServiceImpl implements LogsService {
 	private final ServiceService serviceService;
 	private final ServerService serverService;
 	private final CommandService commandService;
+	private final PathService pathService;
 
 	public LogsServiceImpl(SshCommandService sshCommandService,
 			ServiceService serviceService,
 			ServerService serverService,
-			CommandService commandService) {
+			CommandService commandService,
+			PathService pathService) {
 		this.sshCommandService = sshCommandService;
 		this.serviceService = serviceService;
 		this.serverService = serverService;
 		this.commandService = commandService;
+		this.pathService = pathService;
 	}
 
 	@Override
@@ -40,19 +43,9 @@ public class LogsServiceImpl implements LogsService {
 			throws ServerOperationException, IOException, ServiceOperationException, CommandOperationException,
 			PathOperationException {
 
-		ServerResponseDto server;
-		try {
-			server = serverService.findServerById(serverId)
-					.orElseThrow(() -> new ServerOperationException("Server does not exist"));
-		} catch (com.pawar.todo.amt.exceptions.ServerOperationException exception) {
-			throw new ServerOperationException("Failed to load server", exception);
-		}
-
+		ServerResponseDto server = loadServer(serverId);
 		ServiceResponseDto service = serviceService.findServiceById(serviceId)
 				.orElseThrow(() -> new ServiceOperationException("Service not found"));
-
-		CommandResponseDto commandResponseDto = commandService.findCommand("StreamLogs")
-				.orElseThrow(() -> new CommandOperationException("Command does not exist"));
 
 		log.info("Server: {}", server);
 
@@ -61,17 +54,17 @@ public class LogsServiceImpl implements LogsService {
 			return "Server is OFFLINE";
 		}
 
-		String command = buildCommandString(commandResponseDto, server.hostname(), service.serviceName());
-		log.info("Command: {}", command);
-		log.info("Starting Service: {}", service.serviceName());
+		CommandResponseDto command = resolveStreamCommand();
+		String commandStr = buildCommandString(command, server, service.serviceName());
+		log.info("Command: {}", commandStr);
 
-		String response = sshCommandService.execute(server, command);
+		String response = sshCommandService.execute(server, commandStr);
 		if (response == null) {
-			log.error("No response received from server for command: {}", command);
+			log.error("No response received from server for command: {}", commandStr);
 			return "Failed to fetch logs: No response from server.";
 		}
 
-		log.info("Logs for {} fetched successfully. Response: {}", service.serviceName(), response);
+		log.info("Logs for {} fetched successfully.", service.serviceName());
 		return response;
 	}
 
@@ -89,10 +82,10 @@ public class LogsServiceImpl implements LogsService {
 			return;
 		}
 
-		CommandResponseDto command = commandService.findCommand("StreamLogs")
-				.orElseThrow(() -> new CommandOperationException("Command does not exist"));
-		sshCommandService.stream(server, buildStreamCommand(command, server.hostname(), service.serviceName()),
-				lineConsumer, stopped);
+		CommandResponseDto command = resolveStreamCommand();
+		String streamCommand = buildStreamCommand(command, server, service.serviceName());
+		log.info("Executing stream logs command: {}", streamCommand);
+		sshCommandService.stream(server, streamCommand, lineConsumer, stopped);
 	}
 
 	private ServerResponseDto loadServer(Integer serverId) throws ServerOperationException {
@@ -104,20 +97,72 @@ public class LogsServiceImpl implements LogsService {
 		}
 	}
 
-	private String buildCommandString(CommandResponseDto command, String serverName, String serviceName) {
-		String parameters = command.parameters() != null ? command.parameters() : "";
-		return String
-				.format("%s %s ~/apps/%s/logs/%s/%s.log", command.name(), parameters, serverName, serviceName,
-						serviceName)
-				.trim();
+	private CommandResponseDto resolveStreamCommand() {
+		try {
+			return commandService.findCommand("StreamLogs")
+					.orElseGet(this::defaultStreamCommand);
+		} catch (Exception e) {
+			log.debug("StreamLogs command lookup failed, using default: {}", e.getMessage());
+			return defaultStreamCommand();
+		}
 	}
 
-	private String buildStreamCommand(CommandResponseDto command, String serverName, String serviceName) {
-		String parameters = command.parameters() != null ? command.parameters().trim() : "";
+	private CommandResponseDto defaultStreamCommand() {
+		return new CommandResponseDto(null, "tail", "-n 100", "Stream service logs via tail", "READY", null, null, null, "SYSTEM", "SYSTEM");
+	}
+
+	private String resolveLogFilePath(ServerResponseDto server, String serviceName) {
+		String logsHome = null;
+
+		// 1. Check server-associated paths for LOGS_HOME
+		if (server.paths() != null) {
+			logsHome = server.paths().stream()
+					.filter(p -> "LOGS_HOME".equalsIgnoreCase(p.pathName()))
+					.map(p -> p.pathDescription())
+					.filter(desc -> desc != null && !desc.isBlank())
+					.findFirst()
+					.orElse(null);
+		}
+
+		// 2. Check global PathService for LOGS_HOME
+		if (logsHome == null && pathService != null) {
+			try {
+				logsHome = pathService.findByPathName("LOGS_HOME")
+						.map(p -> p.pathDescription())
+						.filter(desc -> desc != null && !desc.isBlank())
+						.orElse(null);
+			} catch (Exception e) {
+				log.debug("PathService lookup for LOGS_HOME failed: {}", e.getMessage());
+			}
+		}
+
+		// 3. If a configured path is found, use it
+		if (logsHome != null && !logsHome.isBlank()) {
+			String cleanHome = logsHome.trim().replaceAll("/+$", "");
+			if (cleanHome.endsWith(".log")) {
+				return cleanHome;
+			}
+			return String.format("%s/%s/%s.log", cleanHome, serviceName, serviceName);
+		}
+
+		// 4. Default fallback convention
+		return String.format("$HOME/apps/%s/logs/%s/%s.log", server.hostname(), serviceName, serviceName);
+	}
+
+	private String buildCommandString(CommandResponseDto command, ServerResponseDto server, String serviceName) {
+		String cmdName = (command != null && command.name() != null) ? command.name() : "tail";
+		String parameters = (command != null && command.parameters() != null) ? command.parameters().trim() : "-n 200";
+		String logPath = resolveLogFilePath(server, serviceName);
+		return String.format("%s %s %s", cmdName, parameters, logPath).trim();
+	}
+
+	private String buildStreamCommand(CommandResponseDto command, ServerResponseDto server, String serviceName) {
+		String cmdName = (command != null && command.name() != null) ? command.name() : "tail";
+		String parameters = (command != null && command.parameters() != null) ? command.parameters().trim() : "";
 		if (parameters.isBlank() || !parameters.matches(".*(?:^|\\s)-[nN]\\s+\\d+.*")) {
 			parameters = "-n 100 " + parameters;
 		}
-		return String.format("%s %s -F -- $HOME/apps/%s/logs/%s/%s.log", command.name(), parameters, serverName,
-				serviceName, serviceName).trim();
+		String logPath = resolveLogFilePath(server, serviceName);
+		return String.format("%s %s -F -- %s", cmdName, parameters.trim(), logPath).trim();
 	}
 }

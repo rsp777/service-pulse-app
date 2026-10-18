@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: service-pulse
+  labels:
+    app.kubernetes.io/name: service-pulse-app
+    app.kubernetes.io/part-of: service-pulse
