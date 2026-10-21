@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -35,6 +36,10 @@ public class SshCommandService {
 	private final SshCredentialProvider credentialProvider;
 	private final SshSecurityAuditLogger auditLogger;
 
+	public SshCommandService() {
+		this(new SshProperties());
+	}
+
 	public SshCommandService(SshProperties properties) {
 		this(properties, new StaticKeyCredentialProvider(properties), new SshSecurityAuditLogger());
 	}
@@ -43,9 +48,10 @@ public class SshCommandService {
 		this(properties, credentialProvider, new SshSecurityAuditLogger());
 	}
 
+	@Autowired
 	public SshCommandService(SshProperties properties, SshCredentialProvider credentialProvider, SshSecurityAuditLogger auditLogger) {
-		this.properties = properties;
-		this.credentialProvider = credentialProvider != null ? credentialProvider : new StaticKeyCredentialProvider(properties);
+		this.properties = properties != null ? properties : new SshProperties();
+		this.credentialProvider = credentialProvider != null ? credentialProvider : new StaticKeyCredentialProvider(this.properties);
 		this.auditLogger = auditLogger != null ? auditLogger : new SshSecurityAuditLogger();
 	}
 
