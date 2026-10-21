@@ -1,12 +1,12 @@
 package com.pawar.todo.amt.ssh;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.pawar.app.healthcheck.dto.ServerResponseDto;
+import com.pawar.todo.amt.ssh.auth.SshAuthMode;
+import com.pawar.todo.amt.ssh.auth.SshCredentialProvider;
 
 import net.schmizz.sshj.SSHClient;
 import net.schmizz.sshj.connection.channel.direct.Session;
@@ -27,9 +29,19 @@ public class SshCommandService {
 
 	private static final Logger logger = LoggerFactory.getLogger(SshCommandService.class);
 	private final SshProperties properties;
+	private final SshCredentialProvider credentialProvider;
 
 	public SshCommandService(SshProperties properties) {
+		this(properties, new StaticKeyCredentialProvider(properties));
+	}
+
+	public SshCommandService(SshProperties properties, SshCredentialProvider credentialProvider) {
 		this.properties = properties;
+		this.credentialProvider = credentialProvider != null ? credentialProvider : new StaticKeyCredentialProvider(properties);
+	}
+
+	public SshCredentialProvider getCredentialProvider() {
+		return credentialProvider;
 	}
 
 	public String execute(ServerResponseDto server, String command) throws IOException {
@@ -151,14 +163,8 @@ public class SshCommandService {
 
 			client.connect(host, port);
 
-			// Load Private Key
-			KeyProvider keyProvider;
-			if (StringUtils.hasText(properties.getPrivateKeyPassphrase())) {
-				keyProvider = client.loadKeys(properties.getPrivateKeyPath(), properties.getPrivateKeyPassphrase());
-			} else {
-				keyProvider = client.loadKeys(properties.getPrivateKeyPath());
-			}
-
+			// Load key or certificate through credential provider SPI
+			KeyProvider keyProvider = credentialProvider.getKeyProvider(client);
 			client.authPublickey(properties.getUsername(), keyProvider);
 			return client;
 
@@ -169,8 +175,7 @@ public class SshCommandService {
 	}
 
 	private void configureHostKeyVerifier(SSHClient client) throws IOException {
-		// If knownHostsPath is specified and strict checking is enabled, load
-		// known_hosts
+		// If knownHostsPath is specified and strict checking is enabled, load known_hosts
 		if (properties.isStrictHostKeyChecking() && StringUtils.hasText(properties.getKnownHostsPath())) {
 			File knownHosts = new File(properties.getKnownHostsPath());
 			if (knownHosts.exists()) {
@@ -197,8 +202,11 @@ public class SshCommandService {
 	}
 
 	private void validateConfiguration() throws IOException {
-		if (!StringUtils.hasText(properties.getUsername()) || !StringUtils.hasText(properties.getPrivateKeyPath())) {
-			throw new IOException("SSH_USERNAME and SSH_PRIVATE_KEY_PATH must be configured");
+		if (!StringUtils.hasText(properties.getUsername())) {
+			throw new IOException("SSH_USERNAME must be configured");
+		}
+		if (properties.getAuthMode() == SshAuthMode.STATIC && !StringUtils.hasText(properties.getPrivateKeyPath())) {
+			throw new IOException("SSH_PRIVATE_KEY_PATH must be configured when using STATIC auth mode");
 		}
 	}
 }
