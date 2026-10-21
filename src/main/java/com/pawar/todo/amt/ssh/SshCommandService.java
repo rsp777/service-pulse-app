@@ -15,10 +15,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.pawar.app.healthcheck.dto.ServerResponseDto;
+import com.pawar.todo.amt.ssh.audit.SshSecurityAuditLogger;
 import com.pawar.todo.amt.ssh.auth.SshAuthMode;
 import com.pawar.todo.amt.ssh.auth.SshCredentialProvider;
-
+import com.pawar.todo.amt.ssh.auth.StaticKeyCredentialProvider;
 import com.pawar.todo.amt.ssh.verifier.HostCertificateVerifier;
+
 import net.schmizz.sshj.SSHClient;
 import net.schmizz.sshj.connection.channel.direct.Session;
 import net.schmizz.sshj.connection.channel.direct.Session.Command;
@@ -31,24 +33,36 @@ public class SshCommandService {
 	private static final Logger logger = LoggerFactory.getLogger(SshCommandService.class);
 	private final SshProperties properties;
 	private final SshCredentialProvider credentialProvider;
+	private final SshSecurityAuditLogger auditLogger;
 
 	public SshCommandService(SshProperties properties) {
-		this(properties, new StaticKeyCredentialProvider(properties));
+		this(properties, new StaticKeyCredentialProvider(properties), new SshSecurityAuditLogger());
 	}
 
 	public SshCommandService(SshProperties properties, SshCredentialProvider credentialProvider) {
+		this(properties, credentialProvider, new SshSecurityAuditLogger());
+	}
+
+	public SshCommandService(SshProperties properties, SshCredentialProvider credentialProvider, SshSecurityAuditLogger auditLogger) {
 		this.properties = properties;
 		this.credentialProvider = credentialProvider != null ? credentialProvider : new StaticKeyCredentialProvider(properties);
+		this.auditLogger = auditLogger != null ? auditLogger : new SshSecurityAuditLogger();
 	}
 
 	public SshCredentialProvider getCredentialProvider() {
 		return credentialProvider;
 	}
 
+	public SshSecurityAuditLogger getAuditLogger() {
+		return auditLogger;
+	}
+
 	public String execute(ServerResponseDto server, String command) throws IOException {
 		String host = resolveHost(server);
+		long startTime = System.currentTimeMillis();
 		logger.info("Starting SSH command on {} as {} (length={})", host, properties.getUsername(),
 				command == null ? 0 : command.length());
+		auditLogger.logSessionStart(host, properties.getUsername(), credentialProvider.getMetadata(), command);
 
 		try (SSHClient client = connect(server);
 				Session session = client.startSession();
@@ -59,6 +73,8 @@ public class SshCommandService {
 
 			// 2. Check if the channel is still open (indicates timeout)
 			if (remoteCommand.isOpen()) {
+				long duration = System.currentTimeMillis() - startTime;
+				auditLogger.logSessionFailure(host, properties.getUsername(), "Command timed out", duration);
 				throw new IOException(String.format("Command timed out after %d seconds on %s",
 						properties.getCommandTimeoutSeconds(), host));
 			}
@@ -67,10 +83,12 @@ public class SshCommandService {
 			String output = new String(remoteCommand.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
 			String error = new String(remoteCommand.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
 			Integer exitStatus = remoteCommand.getExitStatus();
+			long duration = System.currentTimeMillis() - startTime;
 
 			if (exitStatus == null || exitStatus != 0) {
 				String errorDetails = StringUtils.hasText(error) ? error.trim() : "Exit code: " + exitStatus;
 				logger.error("Remote command failed on {}: {}", host, errorDetails);
+				auditLogger.logSessionFailure(host, properties.getUsername(), errorDetails, duration);
 				if (errorDetails.contains("No such file or directory") || errorDetails.contains("not found")) {
 					throw new IOException("SCRIPTS_UNAVAILABLE: Required script is unavailable on " + host + ": "
 							+ errorDetails);
@@ -78,13 +96,15 @@ public class SshCommandService {
 				throw new IOException("Remote command failed: " + errorDetails);
 			}
 
-			logger.info("SSH command completed on {} with {} output characters", host, output.length());
+			auditLogger.logSessionEnd(host, properties.getUsername(), exitStatus, duration);
+			logger.info("SSH command completed on {} with {} output characters in {}ms", host, output.length(), duration);
 			return output;
 		}
 		catch(Exception e) {
+			long duration = System.currentTimeMillis() - startTime;
+			auditLogger.logSessionFailure(host, properties.getUsername(), e.getMessage(), duration);
 			logger.error("SSH command failed on {}: {}", host, e.getMessage(), e);
 			throw new IOException("Error executing command: " + e.getMessage(), e);
-
 		}
 	}
 
@@ -102,6 +122,8 @@ public class SshCommandService {
 		String host = resolveHost(server);
 		logger.info("Starting SSH log stream on {} as {} (command length={})", host, properties.getUsername(),
 				command == null ? 0 : command.length());
+		auditLogger.logSessionStart(host, properties.getUsername(), credentialProvider.getMetadata(), command);
+		long startTime = System.currentTimeMillis();
 
 		try (SSHClient client = connect(server);
 				Session session = client.startSession();
@@ -126,22 +148,29 @@ public class SshCommandService {
 					}
 				}
 			}
+			long duration = System.currentTimeMillis() - startTime;
 			if (!stopped.get()) {
 				String error = new String(remoteCommand.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
 				Integer exitStatus = remoteCommand.getExitStatus();
 				if (exitStatus == null || exitStatus != 0) {
 					String errorDetails = StringUtils.hasText(error) ? error : "Exit code: " + exitStatus;
+					auditLogger.logSessionFailure(host, properties.getUsername(), errorDetails, duration);
 					if (errorDetails.contains("No such file or directory") || errorDetails.contains("not found")) {
 						throw new IOException("SCRIPTS_UNAVAILABLE: Required script is unavailable on " + host + ": "
 								+ errorDetails);
 					}
 					throw new IOException("Remote command failed: " + errorDetails);
 				}
+				auditLogger.logSessionEnd(host, properties.getUsername(), exitStatus, duration);
+			} else {
+				auditLogger.logSessionEnd(host, properties.getUsername(), 0, duration);
 			}
 			remoteCommand.close();
 			logger.info("SSH log stream completed for {}", host);
 		} catch (IOException exception) {
+			long duration = System.currentTimeMillis() - startTime;
 			if (!stopped.get()) {
+				auditLogger.logSessionFailure(host, properties.getUsername(), exception.getMessage(), duration);
 				logger.error("SSH log stream failed for {}: {}", host, exception.getMessage(), exception);
 				throw exception;
 			}
