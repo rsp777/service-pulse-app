@@ -103,4 +103,14 @@ class StaticKeyCredentialProviderTest {
         assertEquals(mockKeyProvider, result);
         verify(sshClient).loadKeys(keyFile.getAbsolutePath(), "secret-passphrase");
     }
+
+    @Test
+    void isReady_withMixedSlashes_normalizesAndFindsFile(@TempDir File tempDir) throws IOException {
+        File keyFile = new File(tempDir, "id_rsa");
+        assertTrue(keyFile.createNewFile());
+
+        String mixedPath = keyFile.getAbsolutePath().replace(File.separator, "/\\");
+        properties.setPrivateKeyPath(mixedPath);
+        assertTrue(provider.isReady());
+    }
 }

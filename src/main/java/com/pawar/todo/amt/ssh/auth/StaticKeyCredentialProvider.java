@@ -24,7 +24,7 @@ public class StaticKeyCredentialProvider implements SshCredentialProvider {
 
     @Override
     public KeyProvider getKeyProvider(SSHClient client) throws IOException {
-        String keyPath = properties.getPrivateKeyPath();
+        String keyPath = resolvePath(properties.getPrivateKeyPath());
         if (!StringUtils.hasText(keyPath)) {
             throw new IOException("SSH_PRIVATE_KEY_PATH is not configured");
         }
@@ -42,11 +42,22 @@ public class StaticKeyCredentialProvider implements SshCredentialProvider {
 
     @Override
     public boolean isReady() {
-        String keyPath = properties.getPrivateKeyPath();
+        String keyPath = resolvePath(properties.getPrivateKeyPath());
         if (!StringUtils.hasText(keyPath)) {
             return false;
         }
         File file = new File(keyPath);
         return file.exists() && file.canRead();
+    }
+
+    private String resolvePath(String path) {
+        if (!StringUtils.hasText(path)) {
+            return null;
+        }
+        String normalized = path.trim().replace("/\\", "/").replace("\\/", "/");
+        if (normalized.startsWith("~")) {
+            normalized = System.getProperty("user.home") + normalized.substring(1);
+        }
+        return normalized;
     }
 }

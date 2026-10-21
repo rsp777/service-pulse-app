@@ -223,13 +223,17 @@ public class SshCommandService {
 
 			// 2. If knownHostsPath is specified, load known_hosts
 			if (StringUtils.hasText(properties.getKnownHostsPath())) {
-				File knownHosts = new File(properties.getKnownHostsPath());
+				String path = properties.getKnownHostsPath().trim().replace("/\\", "/").replace("\\/", "/");
+				if (path.startsWith("~")) {
+					path = System.getProperty("user.home") + path.substring(1);
+				}
+				File knownHosts = new File(path);
 				if (knownHosts.exists()) {
 					client.loadKnownHosts(knownHosts);
 					verifierConfigured = true;
-					logger.info("Loaded known_hosts from {}", properties.getKnownHostsPath());
+					logger.info("Loaded known_hosts from {}", path);
 				} else {
-					logger.warn("known_hosts file not found at {}", properties.getKnownHostsPath());
+					logger.warn("known_hosts file not found at {}", path);
 				}
 			}
 
