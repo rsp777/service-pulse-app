@@ -18,6 +18,7 @@ import com.pawar.app.healthcheck.dto.ServerResponseDto;
 import com.pawar.todo.amt.ssh.auth.SshAuthMode;
 import com.pawar.todo.amt.ssh.auth.SshCredentialProvider;
 
+import com.pawar.todo.amt.ssh.verifier.HostCertificateVerifier;
 import net.schmizz.sshj.SSHClient;
 import net.schmizz.sshj.connection.channel.direct.Session;
 import net.schmizz.sshj.connection.channel.direct.Session.Command;
@@ -175,18 +176,37 @@ public class SshCommandService {
 	}
 
 	private void configureHostKeyVerifier(SSHClient client) throws IOException {
-		// If knownHostsPath is specified and strict checking is enabled, load known_hosts
-		if (properties.isStrictHostKeyChecking() && StringUtils.hasText(properties.getKnownHostsPath())) {
-			File knownHosts = new File(properties.getKnownHostsPath());
-			if (knownHosts.exists()) {
-				client.loadKnownHosts(knownHosts);
-				return;
+		if (properties.isStrictHostKeyChecking()) {
+			boolean verifierConfigured = false;
+
+			// 1. If Host CA public key is provided, register HostCertificateVerifier
+			if (StringUtils.hasText(properties.getHostCaPublicKey())) {
+				client.addHostKeyVerifier(new HostCertificateVerifier(properties.getHostCaPublicKey()));
+				verifierConfigured = true;
+				logger.info("Configured HostCertificateVerifier with trusted Host CA");
 			}
-			logger.warn("known_hosts file not found at {}. Falling back to PromiscuousVerifier.",
-					properties.getKnownHostsPath());
+
+			// 2. If knownHostsPath is specified, load known_hosts
+			if (StringUtils.hasText(properties.getKnownHostsPath())) {
+				File knownHosts = new File(properties.getKnownHostsPath());
+				if (knownHosts.exists()) {
+					client.loadKnownHosts(knownHosts);
+					verifierConfigured = true;
+					logger.info("Loaded known_hosts from {}", properties.getKnownHostsPath());
+				} else {
+					logger.warn("known_hosts file not found at {}", properties.getKnownHostsPath());
+				}
+			}
+
+			// 3. Fail fast if strict checking is enabled but neither Host CA nor known_hosts is configured
+			if (!verifierConfigured) {
+				throw new SecurityException("Strict host-key verification is enabled, but neither Host CA nor known_hosts is configured.");
+			}
+			return;
 		}
 
-		// Trust all host keys (resolves the ed25519 TransportException)
+		// Fallback for non-strict environments (local/dev/test)
+		logger.warn("Strict host-key verification is DISABLED. PromiscuousVerifier is active. This is insecure for production.");
 		client.addHostKeyVerifier(new PromiscuousVerifier());
 	}
 
