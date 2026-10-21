@@ -22,6 +22,52 @@ services:
       timeout: 5s
       retries: 5
 
+  vault:
+    image: hashicorp/vault:latest
+    container_name: service-pulse-vault
+    restart: unless-stopped
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - service-pulse-net
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  vault-init:
+    image: hashicorp/vault:latest
+    container_name: service-pulse-vault-init
+    restart: "no"
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "Configuring Vault SSH Secrets Engine..."
+        vault secrets enable -path=ssh ssh || true
+        vault write ssh/config/ca generate_signing_key=true || true
+        vault write ssh/roles/servicepulse-runner \
+          key_type=ca \
+          allowed_users="ravi,ubuntu,ec2-user,servicepulse" \
+          default_user="ravi" \
+          ttl="1h" \
+          allow_user_certificates=true
+        echo "Vault SSH CA configured successfully!"
+    networks:
+      - service-pulse-net
+
   service-pulse-app:
     build:
       context: .
@@ -30,6 +76,8 @@ services:
     restart: unless-stopped
     depends_on:
       db:
+        condition: service_healthy
+      vault:
         condition: service_healthy
     ports:
       - "9092:9092"
@@ -41,6 +89,10 @@ services:
       LIQUIBASE_ENABLED: "true"
       HEALTHCHECK_ENABLED: "true"
       SERVICE_MANAGEMENT_ENABLED: "true"
+      SSH_AUTH_MODE: CA_CERTIFICATE
+      SSH_CA_ENDPOINT: http://vault:8200
+      SSH_CA_TOKEN: root
+      SSH_CA_ROLE: servicepulse-runner
     networks:
       - service-pulse-net
 
