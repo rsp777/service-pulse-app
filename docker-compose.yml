@@ -1,69 +1,52 @@
 version: '3.8'
 
 services:
-  monitor-db:
-    image: postgres:latest
-    container_name: monitor-db
+  db:
+    image: mysql:8.0
+    container_name: service-pulse-db
+    restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: ravi
+      MYSQL_ROOT_PASSWORD: ravi
+      MYSQL_DATABASE: service-pulse-app
+      MYSQL_USER: ravi
+      MYSQL_PASSWORD: ravi
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - mysql_data:/var/lib/mysql
     networks:
-      - monitor-net
+      - service-pulse-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "ravi", "-pravi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  db-migrate:
-    image: liquibase/liquibase:4.25
-    container_name: db-migrate
-    volumes:
-      - ./db/changelog:/liquibase/changelog
-      - ./liquibase.properties:/liquibase/liquibase.properties
-    command: update --changelog-file=db.changelog-master.xml --url=jdbc:postgresql://monitor-db:5432/postgres --username=postgres --password=ravi
+  service-pulse-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: service-pulse-app
+    restart: unless-stopped
     depends_on:
-      - monitor-db
-    networks:
-      - monitor-net
-
-  collector:
-    build: ./collector
-    container_name: service-collector
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      monitor-db:
-        condition: service_started
-    environment:
-      datasource.url: jdbc:postgresql://monitor-db:5432/postgres
-      datasource.username: postgres
-      datasource.password: ravi
-      poller.interval: 60s
-    networks:
-      - monitor-net
-
-  dashboard:
-    build: ./dashboard
-    container_name: service-dashboard
+      db:
+        condition: service_healthy
     ports:
-      - "3000:3000"
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      monitor-db:
-        condition: service_started
+      - "9092:9092"
     environment:
-      DB_HOST: monitor-db
-      DB_PORT: 5432
-      DB_USER: postgres
+      DB_URL: jdbc:mysql://db:3306/service-pulse-app?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: ravi
       DB_PASSWORD: ravi
-      DB_NAME: postgres
-      COLLECTOR_URL: http://service-collector:8080
+      SERVER_PORT: 9092
+      LIQUIBASE_ENABLED: "true"
+      HEALTHCHECK_ENABLED: "true"
+      SERVICE_MANAGEMENT_ENABLED: "true"
     networks:
-      - monitor-net
+      - service-pulse-net
 
 networks:
-  monitor-net:
+  service-pulse-net:
     driver: bridge
 
 volumes:
-  postgres_data:
+  mysql_data:
