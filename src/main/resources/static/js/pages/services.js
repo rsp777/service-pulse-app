@@ -94,9 +94,11 @@ async function loadAllServicesView() {
                 selectServer(Number(b.dataset.svcDashboard));
                 showPage('dashboard');
             },
-            '[data-svc-edit]': (b) => {
-                selectServer(Number(b.dataset.svcServer));
-                openServiceModal(Number(b.dataset.svcEdit));
+            '[data-svc-edit]': async (b) => {
+                const sId = Number(b.dataset.svcServer);
+                const svcId = Number(b.dataset.svcEdit);
+                if (sId) await selectServer(sId);
+                await openServiceModal(svcId, sId);
             },
             '[data-svc-delete]': (b) => deleteService(Number(b.dataset.svcDelete)),
         }
@@ -120,7 +122,14 @@ function syncSpringBootHealthUrl(force = false) {
     urlInput.value = `http://${host}:${port}${ctx ? `/${ctx}` : ''}/actuator/health`;
 }
 
-async function openServiceModal(id = null) {
+// Issue #27/#31: Open, populate, and pre-fill Service modal with accurate Spring Boot type and Health Check URL [Author: Ravindra Singh Pawar / Antigravity]
+async function openServiceModal(id = null, serverId = null) {
+    if (serverId && (!state.selectedServer || Number(state.selectedServer.id) !== Number(serverId))) {
+        await selectServer(serverId);
+    }
+    if (!state.selectedServer && state.servers && state.servers.length > 0) {
+        await selectServer(state.servers[0].id);
+    }
     if (!state.selectedServer) return showNotice('Please select a server first.', true);
 
     try {
@@ -129,29 +138,89 @@ async function openServiceModal(id = null) {
         state.paths = [];
     }
 
+    let allConfigs = [];
+    try {
+        allConfigs = unwrap(await apiRequest(API.services.serverServiceConfigsAll, { silent: true })) || [];
+        state.allServerServiceConfigs = allConfigs;
+    } catch {
+        allConfigs = state.allServerServiceConfigs || [];
+    }
+
     $('service-form').reset();
-    $('service-id').value     = id || '';
-    $('service-server').value = state.selectedServer.id;
+    $('service-id').value = id || '';
+    if (typeof renderServerSelectDropdowns === 'function') {
+        renderServerSelectDropdowns();
+    }
 
     const urlInput = $('health-check-url');
     if (urlInput) {
         urlInput.dataset.manualEdited = 'false';
     }
 
-    const service = id ? state.selectedServer.services?.find((s) => s.id === id) : null;
+    let service = null;
+    let targetServer = state.selectedServer;
+
+    if (id) {
+        // 1. Locate service in target server
+        if (targetServer?.services) {
+            service = targetServer.services.find((s) => Number(s.id) === Number(id));
+        }
+        // 2. Search across all servers
+        if (!service && state.servers) {
+            for (const s of state.servers) {
+                const found = (s.services || []).find((svc) => Number(svc.id) === Number(id));
+                if (found) {
+                    service = found;
+                    targetServer = s;
+                    state.selectedServer = s;
+                    break;
+                }
+            }
+        }
+        // 3. Direct API fetch fallback
+        if (!service) {
+            try {
+                service = unwrap(await apiRequest(API.services.byId(id), { silent: true }));
+                if (service?.servers?.length > 0) {
+                    const sId = service.servers[0].id;
+                    targetServer = state.servers.find((s) => Number(s.id) === Number(sId)) || targetServer;
+                }
+            } catch {}
+        }
+    }
+
+    if (targetServer && $('service-server')) {
+        $('service-server').value = targetServer.id;
+    }
+
     if (service) {
         $('service-name').value = service.serviceName || '';
-        const config    = state.serverServiceConfigurations.find((c) => c.serviceId === service.id);
-        const healthUrl = config?.healthCheckUrl || '';
-        $('service-type').value = healthUrl ? 'SPRING_BOOT' : 'OTHER';
+        const config = allConfigs.find((c) => Number(c.serviceId) === Number(id) && (!targetServer || Number(c.serverId) === Number(targetServer.id)))
+                    || allConfigs.find((c) => Number(c.serviceId) === Number(id))
+                    || (state.serverServiceConfigurations || []).find((c) => Number(c.serviceId) === Number(id));
+
+        const healthUrl = config?.healthCheckUrl || service.healthCheckUrl || '';
+        const rawType = (config?.serviceType || service.serviceType || '').toUpperCase();
+        let serviceTypeValue = 'SPRING_BOOT';
+        if (rawType === 'SYSTEMD') {
+            serviceTypeValue = 'SYSTEMD';
+        } else if (rawType === 'OTHER') {
+            serviceTypeValue = 'OTHER';
+        } else if (rawType === 'SPRING_BOOT' || healthUrl.includes('/actuator/health') || !rawType) {
+            serviceTypeValue = 'SPRING_BOOT';
+        }
+        $('service-type').value = serviceTypeValue;
 
         const serverPaths = state.paths.filter((p) =>
-            p.servers?.some((s) => Number(s.id) === Number(state.selectedServer.id))
+            p.servers?.some((s) => Number(s.id) === Number(targetServer?.id))
         );
-        const logsPath    = serverPaths.find((p) => p.pathName === 'LOGS_HOME');
-        const scriptsPath = serverPaths.find((p) => p.pathName === 'SCRIPTS_HOME');
-        $('logs-path').value    = logsPath?.pathDescription    || '';
-        $('scripts-path').value = scriptsPath?.pathDescription || '';
+        const logsPath    = config?.logsPath || serverPaths.find((p) => p.pathName === 'LOGS_HOME')?.pathDescription || '';
+        const scriptsPath = config?.scriptsPath || serverPaths.find((p) => p.pathName === 'SCRIPTS_HOME')?.pathDescription || '';
+        $('logs-path').value    = logsPath;
+        $('scripts-path').value = scriptsPath;
+
+        const isSpringBoot = serviceTypeValue === 'SPRING_BOOT';
+        $('spring-boot-fields').style.display = isSpringBoot ? 'block' : 'none';
 
         if (healthUrl) {
             if (urlInput) {
@@ -160,23 +229,27 @@ async function openServiceModal(id = null) {
             }
             try {
                 const parsed = new URL(healthUrl);
-                $('actuator-port').value = parsed.port || '80';
+                $('actuator-port').value = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
                 $('context-path').value  = parsed.pathname.replace(/\/actuator\/health\/?$/, '');
             } catch {
-                $('actuator-port').value = '8080';
-                $('context-path').value  = '';
+                $('actuator-port').value = config?.actuatorPort || '8080';
+                $('context-path').value  = config?.contextPath || '';
             }
         } else {
-            syncSpringBootHealthUrl(true);
+            $('actuator-port').value = config?.actuatorPort || '8080';
+            $('context-path').value  = config?.contextPath || '';
+            if (isSpringBoot) {
+                syncSpringBootHealthUrl(true);
+            }
         }
     } else {
         $('service-type').value  = 'SPRING_BOOT';
         $('actuator-port').value = '8080';
         $('context-path').value  = '';
+        $('spring-boot-fields').style.display = 'block';
         syncSpringBootHealthUrl(true);
     }
 
-    $('spring-boot-fields').style.display = $('service-type').value === 'SPRING_BOOT' ? 'block' : 'none';
     $('service-modal').classList.add('active');
 }
 
@@ -251,10 +324,12 @@ function initServicesPage() {
         }
 
         const id = $('service-id').value;
+        const serviceType = $('service-type')?.value || 'SPRING_BOOT';
         const payload = {
             id: id ? Number(id) : null,
             servers: [server],
             serviceName: $('service-name').value.trim(),
+            serviceType,
             healthCheckUrl,
             createdSource: 'UI',
             lastUpdatedSource: 'UI',

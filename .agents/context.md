@@ -122,6 +122,12 @@ The application has fully evolved from static disk-based SSH keys to **Keyless S
    - Added on-demand health evaluation API endpoint `POST /api/manage-services/evaluate-service-health`.
    - Synchronized dashboard status badge and service refresh logic.
    - Certified with 13 JUnit 5 unit tests (`ManageServicesImplTest`), 3 controller tests (`ManageServicesControllerTest`), and 24 Playwright cross-browser tests covering positive and negative paths. Merged to `dev`, closed Issue #30.
+13. **Live Service Log Stream Modal Controls, Stream Cleanup & Service Edit Form Pre-population (#31):**
+   - Added toolbar controls to Live Service Log Stream modal (`#logs-modal`): text filter (`#service-log-filter-text`), level dropdown (`#service-log-level-filter`), auto-scroll checkbox (`#service-log-autoscroll`), pause/resume toggle (`#service-log-pause-btn`), clipboard copy (`#service-log-copy-btn`), and buffer clear (`#service-log-clear-btn`).
+   - Fixed top-line clipping by enforcing `padding-top: 12px;` inside terminal `<pre id="logs-output">`.
+   - Clean stream lifecycle management: dismissals via `Close Stream` button, `x` button, backdrop click, or `Escape` key cleanly close client `EventSource` and trigger remote SSH streaming termination on backend.
+   - Fixed Service Application edit modal pre-population: resolved `serviceType` (`SPRING_BOOT`), `healthCheckUrl`, port (`8080`), and context path (`/auth`) from multi-server configurations and persisted `serviceType` on service creation and updates.
+   - Certified with 5 JUnit 5 unit tests (`LogsControllerTest`), 21 Playwright cross-browser tests (`log-streaming-modal.spec.ts`) across Chromium, Firefox, WebKit, and browser E2E session recording (`edit_service_modal_cert_1792661782689.webp`).
 
 ---
 

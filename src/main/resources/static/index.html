@@ -696,21 +696,49 @@
     </div>
 
     <!-- Logs Modal -->
+    <!-- Issue #31: Live service log modal controls and padding fix [Author: Ravindra Singh Pawar / Antigravity] -->
     <div class="modal" id="logs-modal">
-        <div class="modal-content" style="max-width: 780px;">
+        <div class="modal-content" style="max-width: 860px; width: 95%;">
             <div class="modal-header">
-                <h3>Live Service Log Stream</h3>
-                <button class="close" data-close="logs-modal">&times;</button>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="terminal-dots">
+                        <div class="terminal-dot dot-red"></div>
+                        <div class="terminal-dot dot-yellow"></div>
+                        <div class="terminal-dot dot-green"></div>
+                    </div>
+                    <h3 id="service-logs-modal-title" style="margin: 0; font-size: 16px;">Live Service Log Stream</h3>
+                </div>
+                <button class="close" data-close="logs-modal" title="Close (Esc)">&times;</button>
             </div>
             <div class="terminal-window">
-                <div class="terminal-header">
-                    <div class="terminal-title">
-                        <span>TAIL -F // SERVICE LOGS</span>
+                <div class="terminal-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px;">
+                    <div class="terminal-title" style="display: flex; align-items: center; gap: 8px;">
+                        <span id="service-logs-target-label" style="font-weight: 600; color: #94a3b8; font-size: 12px; font-family: var(--font-mono);">TAIL -F // SERVICE LOGS</span>
+                    </div>
+                    <div class="terminal-actions" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" id="service-log-filter-text" placeholder="Filter logs..." style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; font-size: 11.5px; padding: 4px 8px; border-radius: 4px; width: 130px; outline: none; font-family: var(--font-mono);" />
+                        <select id="service-log-level-filter" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; font-size: 11.5px; padding: 4px 8px; border-radius: 4px; outline: none; font-family: var(--font-mono); cursor: pointer;">
+                            <option value="ALL" selected>All Levels</option>
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARN">WARN</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                        <label class="checkbox-field" style="margin: 0; font-size: 11.5px; color: #cbd5e1; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="service-log-autoscroll" checked> Auto-scroll
+                        </label>
+                        <button class="terminal-btn" id="service-log-pause-btn" type="button" title="Pause log stream">Pause Stream</button>
+                        <button class="terminal-btn" id="service-log-copy-btn" type="button" title="Copy visible logs">Copy</button>
+                        <button class="terminal-btn" id="service-log-clear-btn" type="button" title="Clear terminal screen">Clear</button>
                     </div>
                 </div>
-                <pre id="logs-output" class="terminal-body" style="min-height: 380px;">Connecting to log stream...</pre>
+                <pre id="logs-output" class="terminal-body" style="min-height: 380px; max-height: 520px; padding: 12px; padding-top: 12px; box-sizing: border-box; overflow-y: auto;">Connecting to log stream...</pre>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="service-log-stream-status" style="font-size: 12px; font-family: var(--font-mono); color: #10b981;">• Streaming</span>
+                    <span id="service-log-line-count" style="font-size: 11.5px; color: var(--muted); font-family: var(--font-mono);">(0 lines)</span>
+                </div>
                 <button class="btn secondary" data-close="logs-modal" type="button">Close Stream</button>
             </div>
         </div>
