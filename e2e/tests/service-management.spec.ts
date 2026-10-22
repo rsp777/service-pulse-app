@@ -6,11 +6,37 @@ test.describe('Service Application Management & Modals', () => {
     await servicesPage.sidebar.gotoServices();
   });
 
-  test('should render service registry view and server filter selector', async ({ servicesPage }) => {
+  // Issue #28: Verify table headers include Type and Status columns [Author: Ravindra Singh Pawar / Antigravity]
+  test('should render service registry view with Type and Status column headers', async ({ servicesPage }) => {
     await expect(servicesPage.heading).toBeVisible();
     await expect(servicesPage.addServiceButton).toBeVisible();
     await expect(servicesPage.filterServerSelect).toBeVisible();
     await expect(servicesPage.servicesTable).toBeVisible();
+
+    const headers = servicesPage.servicesTable.locator('th');
+    await expect(headers.getByText(/Type/i)).toBeVisible();
+    await expect(headers.getByText(/Status/i)).toBeVisible();
+    await expect(headers.getByText(/Health Check URL/i)).toBeVisible();
+  });
+
+  // Issue #28: Verify Type badges and Status pill badges render for registered services [Author: Ravindra Singh Pawar / Antigravity]
+  test('should display Framework / Type badge and live Status pill in Service Registry', async ({ servicesPage }) => {
+    await expect(servicesPage.servicesTable).toBeVisible();
+
+    // Check if table rows exist
+    const rows = servicesPage.servicesTable.locator('tbody tr');
+    const rowCount = await rows.count();
+    if (rowCount > 0) {
+      const firstRow = rows.first();
+      // Should have a type-badge (.spring-boot, .systemd, or .other)
+      const typeBadge = firstRow.locator('.type-badge');
+      await expect(typeBadge).toBeVisible();
+
+      // Should have a status badge (.status.up, .status.down, or .status.unknown)
+      const statusBadge = firstRow.locator('.status');
+      await expect(statusBadge).toBeVisible();
+      await expect(statusBadge.locator('.pulse-dot')).toBeVisible();
+    }
   });
 
   test('should open Add Service modal and display accessible form controls', async ({ page, servicesPage }) => {

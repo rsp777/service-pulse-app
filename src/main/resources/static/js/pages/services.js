@@ -15,6 +15,7 @@
 // ── All-Services Table View ────────────────────────────────────────────────
 
 // Issue #27: Load all server service configurations to display live Health Check URLs in Registry [Author: Ravindra Singh Pawar / Antigravity]
+// Issue #28: Display Framework/Type and live Status badges in Service Registry [Author: Ravindra Singh Pawar / Antigravity]
 async function loadAllServicesView() {
     const container = $('all-services-table');
     if (!container) return;
@@ -37,30 +38,55 @@ async function loadAllServicesView() {
             allServices.push({
                 ...service,
                 server,
+                serviceType: config?.serviceType || service.serviceType || 'OTHER',
+                status: (state.healthStatuses && state.healthStatuses[service.id]) || config?.status || 'UNKNOWN',
                 healthCheckUrl: config?.healthCheckUrl || service.healthCheckUrl || '',
             });
         });
     });
 
-    const rows = allServices.map((svc) => `
-        <tr>
-            <td><strong>#${svc.id}</strong></td>
-            <td><strong>${escapeHtml(svc.serviceName)}</strong></td>
-            <td>${escapeHtml(svc.server.hostname || svc.server.ipAddress)}</td>
-            <td><code>${escapeHtml(svc.healthCheckUrl || '-')}</code></td>
-            <td>
-                <div class="service-actions">
-                    <button class="btn secondary btn-sm" data-svc-dashboard="${svc.server.id}">View</button>
-                    <button class="btn secondary btn-sm" data-svc-edit="${svc.id}" data-svc-server="${svc.server.id}">Edit</button>
-                    <button class="btn danger btn-sm"    data-svc-delete="${svc.id}">Delete</button>
-                </div>
-            </td>
-        </tr>
-    `);
+    const rows = allServices.map((svc) => {
+        // Issue #28: Format framework / type badge
+        const rawType = (svc.serviceType || 'OTHER').toUpperCase();
+        let typeLabel = 'Other Service';
+        let typeClass = 'other';
+        if (rawType === 'SPRING_BOOT') {
+            typeLabel = 'Spring Boot';
+            typeClass = 'spring-boot';
+        } else if (rawType === 'SYSTEMD') {
+            typeLabel = 'Systemd';
+            typeClass = 'systemd';
+        }
+
+        // Issue #28: Format live status pill badge
+        const rawStatus = (svc.status || 'UNKNOWN').toUpperCase();
+        const isUp = rawStatus === 'UP' || rawStatus === 'ONLINE';
+        const isDown = rawStatus === 'DOWN' || rawStatus === 'OFFLINE';
+        const statusLabel = isUp ? 'UP' : isDown ? 'DOWN' : 'UNKNOWN';
+        const statusClass = isUp ? 'up' : isDown ? 'down' : 'unknown';
+
+        return `
+            <tr>
+                <td><strong>#${svc.id}</strong></td>
+                <td><strong>${escapeHtml(svc.serviceName)}</strong></td>
+                <td>${escapeHtml(svc.server.hostname || svc.server.ipAddress)}</td>
+                <td><span class="type-badge ${typeClass}">${escapeHtml(typeLabel)}</span></td>
+                <td><span class="status ${statusClass}"><span class="pulse-dot"></span>${escapeHtml(statusLabel)}</span></td>
+                <td><code>${escapeHtml(svc.healthCheckUrl || '-')}</code></td>
+                <td>
+                    <div class="service-actions">
+                        <button class="btn secondary btn-sm" data-svc-dashboard="${svc.server.id}">View</button>
+                        <button class="btn secondary btn-sm" data-svc-edit="${svc.id}" data-svc-server="${svc.server.id}">Edit</button>
+                        <button class="btn danger btn-sm"    data-svc-delete="${svc.id}">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
 
     renderTable(
         container,
-        ['ID', 'Service Name', 'Server', 'Health Check URL', 'Actions'],
+        ['ID', 'Service Name', 'Server', 'Type', 'Status', 'Health Check URL', 'Actions'],
         rows,
         'No services found for the selected server filter.',
         {

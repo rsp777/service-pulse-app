@@ -91,7 +91,9 @@ public class ServiceMapper {
 	private void populateServiceFromResponseDto(ServiceResponseDto dto, Service service) {
 		logger.info("Populating Service entity from ServiceResponseDto: {}", dto);
 		service.setServiceName(dto.serviceName());
-		logger.debug("Set serviceName: {}", dto.serviceName());
+		// Issue #28: Map serviceType from ServiceResponseDto [Author: Ravindra Singh Pawar / Antigravity]
+		service.setServiceType(dto.serviceType());
+		logger.debug("Set serviceName: {}, serviceType: {}", dto.serviceName(), dto.serviceType());
 
 		Set<ServerResponseDto> serverResponseDtos = dto.servers();
 		if (serverResponseDtos != null && !serverResponseDtos.isEmpty()) {
@@ -134,7 +136,9 @@ public class ServiceMapper {
 		// }
 		// }
 
+		// Issue #28: Populate serviceType in ServiceResponseDto [Author: Ravindra Singh Pawar / Antigravity]
 		ServiceResponseDto dto = new ServiceResponseDto(entity.getId(), null, entity.getServiceName(),
+				entity.getServiceType(),
 				entity.getCreatedDttm(),
 				entity.getLastUpdatedDttm(), entity.getCreatedSource(), entity.getLastUpdatedSource());
 
