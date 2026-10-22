@@ -31,8 +31,11 @@ function apiUrl(path) {
 /** All known API endpoint paths, grouped by domain. */
 const API = {
     servers: {
-        list:         'api/servers',
-        byId:         (id)         => `api/servers/${id}`,
+        list:           'api/servers',
+        byId:           (id) => `api/servers/${id}`,
+        // Issue #26: Test SSH connection endpoints [Author: Ravindra Singh Pawar / Antigravity]
+        testConnection: 'api/servers/test-connection',
+        testServer:     (id) => `api/servers/${id}/test-connection`,
     },
     services: {
         list:         'api/services',

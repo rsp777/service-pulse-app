@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import com.pawar.app.healthcheck.dto.ConnectionTestResult;
 import com.pawar.app.healthcheck.dto.ServerResponseDto;
 import com.pawar.todo.amt.ssh.audit.SshSecurityAuditLogger;
 import com.pawar.todo.amt.ssh.auth.SshAuthMode;
@@ -65,10 +66,13 @@ public class SshCommandService {
 
 	public String execute(ServerResponseDto server, String command) throws IOException {
 		String host = resolveHost(server);
+		String username = (server != null && StringUtils.hasText(server.sshUsername()))
+				? server.sshUsername().trim()
+				: (StringUtils.hasText(properties.getUsername()) ? properties.getUsername().trim() : "ubuntu");
 		long startTime = System.currentTimeMillis();
-		logger.info("Starting SSH command on {} as {} (length={})", host, properties.getUsername(),
+		logger.info("Starting SSH command on {} as {} (length={})", host, username,
 				command == null ? 0 : command.length());
-		auditLogger.logSessionStart(host, properties.getUsername(), credentialProvider.getMetadata(), command);
+		auditLogger.logSessionStart(host, username, credentialProvider.getMetadata(), command);
 
 		try (SSHClient client = connect(server);
 				Session session = client.startSession();
@@ -102,7 +106,7 @@ public class SshCommandService {
 				throw new IOException("Remote command failed: " + errorDetails);
 			}
 
-			auditLogger.logSessionEnd(host, properties.getUsername(), exitStatus, duration);
+			auditLogger.logSessionEnd(host, username, exitStatus, duration);
 			logger.info("SSH command completed on {} with {} output characters in {}ms", host, output.length(), duration);
 			return output;
 		}
@@ -123,12 +127,40 @@ public class SshCommandService {
 		}
 	}
 
+	// Issue #26: Test SSH connectivity to target server [Author: Ravindra Singh Pawar / Antigravity]
+	public ConnectionTestResult testConnection(ServerResponseDto server) {
+		String host = (server != null && StringUtils.hasText(server.ipAddress())) ? server.ipAddress()
+				: ((server != null && StringUtils.hasText(server.hostname())) ? server.hostname() : "unknown");
+		int port = (server != null && server.sshPort() != null && server.sshPort() > 0)
+				? server.sshPort()
+				: ((properties.getPort() != 0 && properties.getPort() > 0) ? properties.getPort() : 22);
+		String username = (server != null && StringUtils.hasText(server.sshUsername()))
+				? server.sshUsername().trim()
+				: (StringUtils.hasText(properties.getUsername()) ? properties.getUsername().trim() : "ubuntu");
+
+		try {
+			host = resolveHost(server);
+			try (SSHClient client = connect(server)) {
+				if (client.isConnected() && client.isAuthenticated()) {
+					return new ConnectionTestResult(true, String.format("SSH connection and authentication successful to %s:%d as user '%s'", host, port, username));
+				}
+				return new ConnectionTestResult(false, String.format("Connected to %s:%d, but authentication failed for user '%s'", host, port, username));
+			}
+		} catch (Exception e) {
+			logger.warn("SSH connection test failed for {}:{}: {}", host, port, e.getMessage());
+			return new ConnectionTestResult(false, String.format("Connection to %s:%d failed: %s", host, port, e.getMessage()));
+		}
+	}
+
 	public void stream(ServerResponseDto server, String command, Consumer<String> lineConsumer,
 			AtomicBoolean stopped) throws IOException {
 		String host = resolveHost(server);
-		logger.info("Starting SSH log stream on {} as {} (command length={})", host, properties.getUsername(),
+		String username = (server != null && StringUtils.hasText(server.sshUsername()))
+				? server.sshUsername().trim()
+				: (StringUtils.hasText(properties.getUsername()) ? properties.getUsername().trim() : "ubuntu");
+		logger.info("Starting SSH log stream on {} as {} (command length={})", host, username,
 				command == null ? 0 : command.length());
-		auditLogger.logSessionStart(host, properties.getUsername(), credentialProvider.getMetadata(), command);
+		auditLogger.logSessionStart(host, username, credentialProvider.getMetadata(), command);
 		long startTime = System.currentTimeMillis();
 
 		try (SSHClient client = connect(server);
@@ -195,13 +227,19 @@ public class SshCommandService {
 			client.setConnectTimeout(properties.getConnectTimeoutMillis());
 
 			String host = resolveHost(server);
-			int port = (properties.getPort() != 0 && properties.getPort() > 0) ? properties.getPort() : 22;
+			// Issue #26: Use server-specific SSH port and username [Author: Ravindra Singh Pawar / Antigravity]
+			int port = (server != null && server.sshPort() != null && server.sshPort() > 0)
+					? server.sshPort()
+					: ((properties.getPort() != 0 && properties.getPort() > 0) ? properties.getPort() : 22);
 
 			client.connect(host, port);
 
 			// Load key or certificate through credential provider SPI
 			KeyProvider keyProvider = credentialProvider.getKeyProvider(client);
-			client.authPublickey(properties.getUsername(), keyProvider);
+			String username = (server != null && StringUtils.hasText(server.sshUsername()))
+					? server.sshUsername().trim()
+					: (StringUtils.hasText(properties.getUsername()) ? properties.getUsername().trim() : "ubuntu");
+			client.authPublickey(username, keyProvider);
 			return client;
 
 		} catch (IOException exception) {

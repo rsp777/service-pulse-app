@@ -68,7 +68,12 @@ function renderServersTable() {
             <tr>
                 <td><strong>#${s.id}</strong></td>
                 <td><strong>${escapeHtml(s.hostname || 'Unnamed')}</strong></td>
-                <td><code>${escapeHtml(s.ipAddress || '')}</code></td>
+                <td>
+                    <code>${escapeHtml(s.ipAddress || '')}</code>
+                    <div style="font-size: 11.5px; color: var(--muted); margin-top: 2px;">
+                        <span style="font-family: var(--font-mono);">:${s.sshPort || 22}</span> (${escapeHtml(s.sshUsername || 'ubuntu')})
+                    </div>
+                </td>
                 <td>${escapeHtml(s.osType || 'Linux')}</td>
                 <td><span class="status ${statusClass}"><span class="pulse-dot"></span>${escapeHtml(s.status || 'UNKNOWN')}</span></td>
                 <td>${serviceCount} service(s)</td>
@@ -84,7 +89,7 @@ function renderServersTable() {
 
     renderTable(
         $('server-table'),
-        ['ID', 'Hostname', 'IP Address', 'OS', 'Status', 'Services', 'Actions'],
+        ['ID', 'Hostname', 'IP Address / SSH', 'OS', 'Status', 'Services', 'Actions'],
         rows,
         'No servers registered. Click "+ Add server" to add your first server.',
         {
@@ -143,18 +148,48 @@ async function selectServer(id) {
 
 // ── Modal ─────────────────────────────────────────────────────────────────
 
+// Issue #26: Connection feedback helper [Author: Ravindra Singh Pawar / Antigravity]
+function showConnectionFeedback(status, message) {
+    const box = $('connection-test-feedback');
+    if (!box) return;
+    box.style.display = 'block';
+    if (status === true) {
+        box.style.background = 'var(--ok-light)';
+        box.style.color = '#065f46';
+        box.style.border = '1px solid var(--ok-border)';
+    } else if (status === false) {
+        box.style.background = 'var(--bad-light)';
+        box.style.color = '#991b1b';
+        box.style.border = '1px solid var(--bad-border)';
+    } else {
+        box.style.background = 'var(--paper)';
+        box.style.color = 'var(--muted)';
+        box.style.border = '1px solid var(--line)';
+    }
+    box.textContent = message;
+}
+
 function openServerModal(id = null) {
     $('server-form').reset();
     $('server-id').value = id || '';
     $('os-type').value   = 'Linux';
+    $('ssh-port').value  = '22';
+    $('ssh-username').value = 'ubuntu';
+
+    const feedback = $('connection-test-feedback');
+    if (feedback) {
+        feedback.style.display = 'none';
+        feedback.textContent = '';
+    }
 
     if (id) {
         const server = state.servers.find((s) => s.id === id);
         if (!server) return showNotice('Server not found.', true);
-        $('hostname').value      = server.hostname  || '';
-        $('ip-address').value    = server.ipAddress || '';
-        $('os-type').value       = server.osType    || 'Linux';
-        $('server-status').value = server.status    || 'ONLINE';
+        $('hostname').value     = server.hostname  || '';
+        $('ip-address').value   = server.ipAddress || '';
+        $('os-type').value      = server.osType    || 'Linux';
+        $('ssh-port').value     = server.sshPort   || 22;
+        $('ssh-username').value = server.sshUsername || 'ubuntu';
     }
     $('server-modal').classList.add('active');
 }
@@ -174,18 +209,22 @@ async function deleteServer(id) {
 // ── Form Handlers ─────────────────────────────────────────────────────────
 
 function initServerFormHandlers() {
+    // Issue #26: Handle Server Save with SSH fields & dynamic status [Author: Ravindra Singh Pawar / Antigravity]
     $('server-form').onsubmit = async (e) => {
         e.preventDefault();
-        const id      = $('server-id').value;
+        const id = $('server-id').value;
+        const existingServer = id ? state.servers.find((s) => s.id === Number(id)) : null;
         const payload = {
-            id:               id ? Number(id) : null,
-            hostname:         $('hostname').value.trim(),
-            ipAddress:        $('ip-address').value.trim(),
-            osType:           $('os-type').value.trim(),
-            status:           $('server-status').value,
-            paths:            [],
-            services:         [],
-            createdSource:    'UI',
+            id:                id ? Number(id) : null,
+            hostname:          $('hostname').value.trim(),
+            ipAddress:         $('ip-address').value.trim(),
+            osType:            $('os-type').value.trim(),
+            status:            existingServer ? existingServer.status : 'UNKNOWN',
+            sshPort:           Number($('ssh-port').value) || 22,
+            sshUsername:       $('ssh-username').value.trim() || 'ubuntu',
+            paths:             [],
+            services:          [],
+            createdSource:     'UI',
             lastUpdatedSource: 'UI',
         };
         try {
@@ -200,6 +239,50 @@ function initServerFormHandlers() {
             showNotice('Failed to save server: ' + err.message, true);
         }
     };
+
+    // Issue #26: Test SSH connection handler [Author: Ravindra Singh Pawar / Antigravity]
+    const testBtn = $('btn-test-connection');
+    if (testBtn) {
+        testBtn.onclick = async () => {
+            const ipAddress = $('ip-address').value.trim();
+            if (!ipAddress) {
+                showConnectionFeedback(false, 'Please enter an IP address or DNS before testing.');
+                return;
+            }
+
+            const testPayload = {
+                id:          $('server-id').value ? Number($('server-id').value) : null,
+                hostname:    $('hostname').value.trim() || ipAddress,
+                ipAddress:   ipAddress,
+                osType:      $('os-type').value.trim() || 'Linux',
+                sshPort:     Number($('ssh-port').value) || 22,
+                sshUsername: $('ssh-username').value.trim() || 'ubuntu',
+            };
+
+            testBtn.disabled = true;
+            testBtn.textContent = '⏳ Testing SSH...';
+            showConnectionFeedback(null, 'Attempting SSH handshake via Vault Keyless CA...');
+
+            try {
+                const res = await apiRequest(API.servers.testConnection, {
+                    method: 'POST',
+                    body:   JSON.stringify(testPayload),
+                    silent: true,
+                });
+                const data = res?.data || res;
+                if (data && data.connected) {
+                    showConnectionFeedback(true, `✅ ${data.message || 'Connection successful!'}`);
+                } else {
+                    showConnectionFeedback(false, `❌ ${data?.message || 'Connection refused or unreachable.'}`);
+                }
+            } catch (err) {
+                showConnectionFeedback(false, `❌ ${err.message || 'Connection test failed.'}`);
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '🔌 Test Connection';
+            }
+        };
+    }
 
     $('server-select').onchange = (e) => selectServer(Number(e.target.value));
     $('add-server')?.addEventListener('click',      () => openServerModal());

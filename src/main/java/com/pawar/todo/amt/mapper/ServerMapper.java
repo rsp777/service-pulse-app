@@ -138,7 +138,19 @@ public class ServerMapper {
 		server.setLastUpdatedDttm(dto.lastUpdatedDttm());
 		server.setCreatedSource(dto.createdSource());
 		server.setLastUpdatedSource(dto.lastUpdatedSource());
-		logger.debug("Set timestamps and source info");
+		// Issue #26: Map SSH port, username, and keyId [Author: Ravindra Singh Pawar / Antigravity]
+		if (dto.sshPort() != null && dto.sshPort() > 0) {
+			server.setSshPort(dto.sshPort());
+		} else if (server.getSshPort() == null) {
+			server.setSshPort(22);
+		}
+		if (dto.sshUsername() != null && !dto.sshUsername().isBlank()) {
+			server.setSshUsername(dto.sshUsername().trim());
+		} else if (server.getSshUsername() == null || server.getSshUsername().isBlank()) {
+			server.setSshUsername("ubuntu");
+		}
+		server.setSshKeyId(dto.sshKeyId());
+		logger.debug("Set timestamps, source info, and SSH config");
 	}
 
 	private void populateServerFromResponseDto(ServerResponseDto dto, Server server) {
@@ -186,6 +198,18 @@ public class ServerMapper {
 		server.setLastUpdatedDttm(dto.lastUpdatedDttm());
 		server.setCreatedSource(dto.createdSource());
 		server.setLastUpdatedSource(dto.lastUpdatedSource());
+		// Issue #26: Map SSH port, username, and keyId [Author: Ravindra Singh Pawar / Antigravity]
+		if (dto.sshPort() != null && dto.sshPort() > 0) {
+			server.setSshPort(dto.sshPort());
+		} else if (server.getSshPort() == null) {
+			server.setSshPort(22);
+		}
+		if (dto.sshUsername() != null && !dto.sshUsername().isBlank()) {
+			server.setSshUsername(dto.sshUsername().trim());
+		} else if (server.getSshUsername() == null || server.getSshUsername().isBlank()) {
+			server.setSshUsername("ubuntu");
+		}
+		server.setSshKeyId(dto.sshKeyId());
 		logger.debug("Set timestamps and source info");
 	}
 
@@ -214,10 +238,12 @@ public class ServerMapper {
 			serviceResponseDtos.add(serviceResponseDto);
 		}
 
+		// Issue #26: Populate SSH properties in ServerRequestDto [Author: Ravindra Singh Pawar / Antigravity]
 		ServerRequestDto dto = new ServerRequestDto(entity.getId(), entity.getHostname(), entity.getIpAddress(),
-				entity.getOsType(), entity.getStatus().name(), entity.getLastHealthChecked(), pathRequestDtos,
+				entity.getOsType(), entity.getStatus() != null ? entity.getStatus().name() : "UNKNOWN", entity.getLastHealthChecked(), pathRequestDtos,
 				serviceResponseDtos, entity.getCreatedDttm(), entity.getLastUpdatedDttm(), entity.getCreatedSource(),
-				entity.getLastUpdatedSource());
+				entity.getLastUpdatedSource(), entity.getSshPort() != null ? entity.getSshPort() : 22,
+				entity.getSshUsername() != null ? entity.getSshUsername() : "ubuntu", entity.getSshKeyId());
 
 		logger.debug("Created ServerResponseDto with values: {}", String.format("id=%s, hostname=%s, ip=%s, os=%s",
 				entity.getId(), entity.getHostname(), entity.getIpAddress(), entity.getOsType()));
@@ -257,10 +283,13 @@ public class ServerMapper {
 				}
 			}
 
+			// Issue #26: Populate SSH properties in ServerResponseDto [Author: Ravindra Singh Pawar / Antigravity]
 			ServerResponseDto dto = new ServerResponseDto(entity.getId(), entity.getHostname(), entity.getIpAddress(),
-					entity.getOsType(), entity.getStatus().name(), entity.getLastHealthChecked(), pathResponseDtos,
+					entity.getOsType(), entity.getStatus() != null ? entity.getStatus().name() : "UNKNOWN", entity.getLastHealthChecked(), pathResponseDtos,
 					serviceResponseDtos, entity.getCreatedDttm(), entity.getLastUpdatedDttm(),
-					entity.getCreatedSource(), entity.getLastUpdatedSource());
+					entity.getCreatedSource(), entity.getLastUpdatedSource(),
+					entity.getSshPort() != null ? entity.getSshPort() : 22,
+					entity.getSshUsername() != null ? entity.getSshUsername() : "ubuntu", entity.getSshKeyId());
 
 			logger.debug("Created ServerResponseDto with values: {}", String.format("id=%s, hostname=%s, ip=%s, os=%s",
 					entity.getId(), entity.getHostname(), entity.getIpAddress(), entity.getOsType()));
@@ -311,10 +340,12 @@ public class ServerMapper {
 			serviceResponseDtos.add(serviceResponseDto);
 		}
 
+		// Issue #26: Populate SSH properties in ServerRequestDto [Author: Ravindra Singh Pawar / Antigravity]
 		ServerRequestDto dto = new ServerRequestDto(entity.getId(), entity.getHostname(), entity.getIpAddress(),
-				entity.getOsType(), entity.getStatus().name(), entity.getLastHealthChecked(), pathRequestDtos,
+				entity.getOsType(), entity.getStatus() != null ? entity.getStatus().name() : "UNKNOWN", entity.getLastHealthChecked(), pathRequestDtos,
 				serviceResponseDtos, entity.getCreatedDttm(), entity.getLastUpdatedDttm(), entity.getCreatedSource(),
-				entity.getLastUpdatedSource());
+				entity.getLastUpdatedSource(), entity.getSshPort() != null ? entity.getSshPort() : 22,
+				entity.getSshUsername() != null ? entity.getSshUsername() : "ubuntu", entity.getSshKeyId());
 
 		logger.debug("Created ServerRequestDto with values: {}", String.format("hostname=%s, ip=%s, os=%s",
 				entity.getHostname(), entity.getIpAddress(), entity.getOsType()));

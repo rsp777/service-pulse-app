@@ -399,6 +399,8 @@
 
     <!-- Modals -->
     <!-- Server Modal -->
+    <!-- Server Modal -->
+    <!-- Issue #26: Server SSH Configuration & Connection Testing Modal [Author: Ravindra Singh Pawar / Antigravity] -->
     <div class="modal" id="server-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -413,15 +415,36 @@
                 <input id="ip-address" required placeholder="192.168.1.100">
                 <label for="os-type">Operating System</label>
                 <input id="os-type" value="Linux">
-                <label for="server-status">Status</label>
-                <select id="server-status">
-                    <option value="ONLINE">ONLINE</option>
-                    <option value="OFFLINE">OFFLINE</option>
-                    <option value="UNKNOWN">UNKNOWN</option>
-                </select>
-                <div class="modal-footer">
-                    <button type="button" class="btn secondary" data-close="server-modal">Cancel</button>
-                    <button class="btn" type="submit">Save Server</button>
+
+                <!-- Issue #26: SSH Host Configuration & Keyless Authentication [Author: Ravindra Singh Pawar / Antigravity] -->
+                <div style="margin-top: 16px; padding: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="font-size: 13px; font-weight: 600; color: var(--ink);">SSH Connectivity &amp; Credentials</span>
+                        <span class="status online" style="font-size: 11px;">🔒 Keyless Vault CA</span>
+                    </div>
+                    <div class="form-grid">
+                        <div>
+                            <label for="ssh-port" style="margin-top: 0;">SSH Port *</label>
+                            <input id="ssh-port" type="number" value="22" min="1" max="65535" required placeholder="22">
+                        </div>
+                        <div>
+                            <label for="ssh-username" style="margin-top: 0;">SSH Username *</label>
+                            <input id="ssh-username" required placeholder="ubuntu" value="ubuntu">
+                        </div>
+                    </div>
+                    <p style="margin: 8px 0 0; font-size: 12px; color: var(--muted);">
+                        Authentication uses short-lived ephemeral SSH certificates signed on-demand by HashiCorp Vault.
+                    </p>
+                </div>
+
+                <div id="connection-test-feedback" style="margin-top: 14px; display: none; padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px;"></div>
+
+                <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" class="btn secondary btn-sm" id="btn-test-connection">🔌 Test Connection</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn secondary" data-close="server-modal">Cancel</button>
+                        <button class="btn" type="submit">Save Server</button>
+                    </div>
                 </div>
             </form>
         </div>

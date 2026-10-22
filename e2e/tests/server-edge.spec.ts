@@ -32,17 +32,42 @@ test.describe('Server Inventory Management — Edge Cases & Validation', () => {
     await serversPage.serverModal.cancel();
   });
 
-  test('should cycle through all server status states (ONLINE, OFFLINE, UNKNOWN)', async ({ serversPage }) => {
+  // Issue #26: Test SSH configuration inputs and connection test feedback [Author: Ravindra Singh Pawar / Antigravity]
+  test('should handle SSH port and username configuration and test connection feedback', async ({ page, serversPage }) => {
     await serversPage.openAddServerModal();
 
-    await serversPage.serverModal.statusSelect.selectOption('ONLINE');
-    await expect(serversPage.serverModal.statusSelect).toHaveValue('ONLINE');
+    // Default values
+    await expect(serversPage.serverModal.sshPortInput).toHaveValue('22');
+    await expect(serversPage.serverModal.sshUsernameInput).toHaveValue('ubuntu');
 
-    await serversPage.serverModal.statusSelect.selectOption('OFFLINE');
-    await expect(serversPage.serverModal.statusSelect).toHaveValue('OFFLINE');
+    // Custom SSH port and user
+    await serversPage.serverModal.sshPortInput.fill('2222');
+    await serversPage.serverModal.sshUsernameInput.fill('deployer');
+    await expect(serversPage.serverModal.sshPortInput).toHaveValue('2222');
+    await expect(serversPage.serverModal.sshUsernameInput).toHaveValue('deployer');
 
-    await serversPage.serverModal.statusSelect.selectOption('UNKNOWN');
-    await expect(serversPage.serverModal.statusSelect).toHaveValue('UNKNOWN');
+    // Negative case: Clicking test connection without IP displays warning
+    await serversPage.serverModal.testConnection();
+    await expect(serversPage.serverModal.connectionFeedback).toBeVisible();
+    await expect(serversPage.serverModal.connectionFeedback).toContainText('Please enter an IP address');
+
+    // Positive mock case: Test connection response display
+    await page.route('**/api/servers/test-connection', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          message: 'SSH handshake successful',
+          data: { connected: true, message: 'SSH handshake successful' }
+        })
+      });
+    });
+
+    await serversPage.serverModal.ipAddressInput.fill('10.0.0.1');
+    await serversPage.serverModal.testConnection();
+    await expect(serversPage.serverModal.connectionFeedback).toBeVisible();
+    await expect(serversPage.serverModal.connectionFeedback).toContainText('SSH handshake successful');
 
     await serversPage.serverModal.cancel();
   });

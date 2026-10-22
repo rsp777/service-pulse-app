@@ -72,12 +72,23 @@ class SshCommandServiceTest {
         assertEquals(auditLogger, service.getAuditLogger());
     }
 
+    // Issue #26: Unit tests for testConnection (+ve and -ve) [Author: Ravindra Singh Pawar / Antigravity]
     @Test
-    void isReachable_whenConnectionFails_returnsFalse() {
+    void testConnection_whenUnreachable_returnsFailureResult() {
         properties.setUsername("servicepulse");
         properties.setPrivateKeyPath("invalid-path");
-        ServerResponseDto server = new ServerResponseDto(1, "unreachable-host", "127.0.0.99", null, null, null, null, null, null, null, null, null);
+        ServerResponseDto server = new ServerResponseDto(1, "unreachable-host", "127.0.0.99", null, null, null, null, null, null, null, null, null, 2222, "custom-user", null);
 
-        assertFalse(service.isReachable(server));
+        com.pawar.app.healthcheck.dto.ConnectionTestResult result = service.testConnection(server);
+        assertNotNull(result);
+        assertFalse(result.connected());
+        assertNotNull(result.message());
+    }
+
+    @Test
+    void testConnection_whenNullServer_returnsFailureGracefully() {
+        com.pawar.app.healthcheck.dto.ConnectionTestResult result = service.testConnection(null);
+        assertNotNull(result);
+        assertFalse(result.connected());
     }
 }

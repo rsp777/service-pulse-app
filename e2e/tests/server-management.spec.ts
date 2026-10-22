@@ -17,22 +17,27 @@ test.describe('Server Management & Modals', () => {
     await expect(serversPage.serverModal.modal).toHaveClass(/active/);
     await expect(serversPage.serverModal.heading).toBeVisible();
 
-    // Verify form inputs
+    // Issue #26: Verify form inputs including SSH configuration [Author: Ravindra Singh Pawar / Antigravity]
     await expect(serversPage.serverModal.hostnameInput).toBeVisible();
     await expect(serversPage.serverModal.ipAddressInput).toBeVisible();
     await expect(serversPage.serverModal.osTypeSelect).toBeVisible();
-    await expect(serversPage.serverModal.statusSelect).toBeVisible();
+    await expect(serversPage.serverModal.sshPortInput).toBeVisible();
+    await expect(serversPage.serverModal.sshUsernameInput).toBeVisible();
+    await expect(serversPage.serverModal.testConnectionButton).toBeVisible();
 
-    // Fill form fields
+    // Fill form fields including SSH port and username
     await serversPage.serverModal.fill({
       hostname: 'auth-wms.internal',
       ipAddress: '100.87.125.44',
       osType: 'Linux',
-      status: 'ONLINE'
+      sshPort: 22,
+      sshUsername: 'ubuntu'
     });
 
     await expect(serversPage.serverModal.hostnameInput).toHaveValue('auth-wms.internal');
     await expect(serversPage.serverModal.ipAddressInput).toHaveValue('100.87.125.44');
+    await expect(serversPage.serverModal.sshPortInput).toHaveValue('22');
+    await expect(serversPage.serverModal.sshUsernameInput).toHaveValue('ubuntu');
 
     // Cancel and ensure modal closes
     await serversPage.serverModal.cancel();

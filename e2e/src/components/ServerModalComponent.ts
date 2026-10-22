@@ -5,12 +5,14 @@ export interface ServerFormData {
   hostname: string;
   ipAddress: string;
   osType?: string;
-  status?: string;
+  sshPort?: number;
+  sshUsername?: string;
 }
 
 /**
  * ServerModalComponent — modal dialog for registering or modifying a target Linux host.
  * Employs role and label-first locators for robust, accessible automation.
+ * Issue #26: Added SSH credentials and Test Connection button locators [Author: Ravindra Singh Pawar / Antigravity]
  */
 export class ServerModalComponent extends BaseComponent {
   readonly modal: Locator;
@@ -18,7 +20,10 @@ export class ServerModalComponent extends BaseComponent {
   readonly hostnameInput: Locator;
   readonly ipAddressInput: Locator;
   readonly osTypeSelect: Locator;
-  readonly statusSelect: Locator;
+  readonly sshPortInput: Locator;
+  readonly sshUsernameInput: Locator;
+  readonly testConnectionButton: Locator;
+  readonly connectionFeedback: Locator;
   readonly saveButton: Locator;
   readonly cancelButton: Locator;
   readonly closeButton: Locator;
@@ -27,13 +32,16 @@ export class ServerModalComponent extends BaseComponent {
     super(page);
     this.modal = page.locator('#server-modal');
     this.heading = this.modal.getByRole('heading', { name: /Server Host/i });
-    this.hostnameInput  = this.modal.locator('#hostname');
-    this.ipAddressInput = this.modal.locator('#ip-address');
-    this.osTypeSelect   = this.modal.locator('#os-type');
-    this.statusSelect   = this.modal.locator('#server-status');
-    this.saveButton     = this.modal.getByRole('button', { name: 'Save Server' });
-    this.cancelButton   = this.modal.getByRole('button', { name: 'Cancel' });
-    this.closeButton    = this.modal.getByRole('button', { name: '×' });
+    this.hostnameInput       = this.modal.locator('#hostname');
+    this.ipAddressInput      = this.modal.locator('#ip-address');
+    this.osTypeSelect        = this.modal.locator('#os-type');
+    this.sshPortInput        = this.modal.locator('#ssh-port');
+    this.sshUsernameInput    = this.modal.locator('#ssh-username');
+    this.testConnectionButton = this.modal.locator('#btn-test-connection');
+    this.connectionFeedback  = this.modal.locator('#connection-test-feedback');
+    this.saveButton          = this.modal.getByRole('button', { name: 'Save Server' });
+    this.cancelButton        = this.modal.getByRole('button', { name: 'Cancel' });
+    this.closeButton         = this.modal.getByRole('button', { name: '×' });
   }
 
   async isVisible(): Promise<boolean> {
@@ -46,9 +54,16 @@ export class ServerModalComponent extends BaseComponent {
     if (data.osType) {
       await this.osTypeSelect.fill(data.osType);
     }
-    if (data.status) {
-      await this.statusSelect.selectOption(data.status);
+    if (data.sshPort !== undefined) {
+      await this.sshPortInput.fill(String(data.sshPort));
     }
+    if (data.sshUsername) {
+      await this.sshUsernameInput.fill(data.sshUsername);
+    }
+  }
+
+  async testConnection() {
+    await this.testConnectionButton.click();
   }
 
   async save() {
