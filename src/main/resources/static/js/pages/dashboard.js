@@ -211,9 +211,10 @@ async function bulkServiceAction(action) {
 // ── SSH Command Execution ──────────────────────────────────────────────────
 
 function initCommandExecutionPanel() {
+    // Issue #29: Resolve executable command string for command-select dropdown [Author: Ravindra Singh Pawar / Antigravity]
     $('command-select').onchange = (e) => {
         const cmd = state.commands.find((c) => String(c.id) === e.target.value);
-        if (cmd) $('command').value = [cmd.name, cmd.parameters].filter(Boolean).join(' ');
+        if (cmd) $('command').value = typeof getExecutableCommand === 'function' ? getExecutableCommand(cmd) : [cmd.name, cmd.parameters].filter(Boolean).join(' ');
     };
 
     $('command-form').onsubmit = async (e) => {

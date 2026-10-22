@@ -1,5 +1,6 @@
 package com.pawar.todo.amt.controller;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.pawar.app.healthcheck.dto.CommandRequestDto;
 import com.pawar.app.healthcheck.dto.CommandResponseDto;
+import com.pawar.todo.amt.constants.CommandStatus;
 import com.pawar.todo.amt.exceptions.CommandOperationException;
 import com.pawar.todo.amt.response.ApiResponse;
 import com.pawar.todo.amt.service.CommandService;
@@ -35,14 +37,52 @@ public class CommandController {
 		this.sshCommandService = sshCommandService;
 	}
 
+	// Issue #29: Execute SSH command with optional commandId to record Last Exit Code and Executed At [Author: Ravindra Singh Pawar / Antigravity]
 	@PostMapping("/execute")
-	public ResponseEntity<ApiResponse<String>> execute(@RequestParam Integer serverId, @RequestParam String command) {
+	public ResponseEntity<ApiResponse<String>> execute(
+			@RequestParam Integer serverId,
+			@RequestParam String command,
+			@RequestParam(required = false) Integer commandId) {
 		try {
 			String output = sshCommandService.execute(serverService.findServerById(serverId)
 					.orElseThrow(() -> new IllegalArgumentException("Server not found: " + serverId)), command);
+			if (commandId != null) {
+				try {
+					commandService.findCommandById(commandId).ifPresent(c -> {
+						try {
+							CommandRequestDto updateDto = new CommandRequestDto(
+									c.name(), c.description(), c.parameters(),
+									CommandStatus.COMPLETED.name(), "Exit 0",
+									c.createdDttm(), LocalDateTime.now(), c.createdSource(), "EXECUTION");
+							commandService.updateCommand(commandId, updateDto);
+						} catch (Exception e) {
+							logger.warn("Failed to update execution status for command {}: {}", commandId, e.getMessage());
+						}
+					});
+				} catch (Exception e) {
+					logger.warn("Failed to lookup command {}: {}", commandId, e.getMessage());
+				}
+			}
 			return ResponseEntity.ok(new ApiResponse<>(true, "Command completed", output));
 		} catch (Exception exception) {
 			logger.error("Command execution failed for server {}", serverId, exception);
+			if (commandId != null) {
+				try {
+					commandService.findCommandById(commandId).ifPresent(c -> {
+						try {
+							CommandRequestDto updateDto = new CommandRequestDto(
+									c.name(), c.description(), c.parameters(),
+									CommandStatus.FAILED.name(), "Exit 1: " + exception.getMessage(),
+									c.createdDttm(), LocalDateTime.now(), c.createdSource(), "EXECUTION");
+							commandService.updateCommand(commandId, updateDto);
+						} catch (Exception e) {
+							logger.warn("Failed to update failure status for command {}: {}", commandId, e.getMessage());
+						}
+					});
+				} catch (Exception e) {
+					logger.warn("Failed to lookup command {}: {}", commandId, e.getMessage());
+				}
+			}
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body(new ApiResponse<>(false, exception.getMessage(), null));
 		}

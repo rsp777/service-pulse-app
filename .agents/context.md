@@ -100,6 +100,22 @@ The application has fully evolved from static disk-based SSH keys to **Keyless S
    - High-integrity structured security audit logs (`SshSecurityAuditLogger`) recording SSH events without exposing secrets.
 7. **Automated End-to-End Test Suite (#23):**
    - `KeylessSshIntegrationTest` verifies 5 scenarios including zero-downtime rotation, untrusted CA rejection, and expired certificate handling.
+8. **SSH Credentials & Dynamic Server Probing (#26):**
+   - Added SSH credentials, Vault CA integration, dynamic status probing, and connection test endpoint (`POST /api/servers/{id}/test-connection`).
+   - Merged to `dev`, closed Issue #26.
+9. **Actuator Health Check URL & Multi-Server Association (#27):**
+   - Dynamic Actuator health check URL resolution with port and context path overrides in service modal.
+   - Multi-server service configuration query endpoint `GET /api/server-service-configurations`.
+   - Certified with 6 JUnit 5 tests and 27 Playwright cross-browser tests. Merged to `dev`, closed Issue #27.
+10. **Global Service Registry Type & Live Status Badges (#28):**
+   - Exposed `serviceType` across DTOs and Mappers with CSS styling (`.spring-boot`, `.systemd`, `.other`).
+   - Added `TYPE` badge and live `STATUS` pill badge (`• UP` / `• DOWN`) with pulse dots in `loadAllServicesView()`.
+   - Certified with 11 JUnit 5 tests and 30 Playwright cross-browser tests. Merged to `dev`, closed Issue #28.
+11. **Preconfigured Command Context Selector & Status Tracking (#29):**
+   - Target server context selector `#command-target-server` dynamically synced with active server state.
+   - Enforced server selection validation with user prompt notice before execution.
+   - Reusable command execution via `POST /api/commands/execute?commandId=N`, updating execution timestamp, exit code (`0` for COMPLETED, `1` for FAILED), and output streaming to dashboard console.
+   - Certified with 6 JUnit 5 tests (`CommandControllerTest`) and 21 Playwright cross-browser tests covering positive (+ve) and negative (-ve) paths. Merged to `dev`, closed Issue #29.
 
 ---
 

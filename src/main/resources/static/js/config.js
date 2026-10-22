@@ -56,8 +56,9 @@ const API = {
     commands: {
         list:         'api/commands',
         byId:         (id)         => `api/commands/${id}`,
-        execute:      (serverId, command) =>
-                        `api/commands/execute?serverId=${serverId}&command=${encodeURIComponent(command)}`,
+        // Issue #29: Pass optional commandId to track last run status and execution time [Author: Ravindra Singh Pawar / Antigravity]
+        execute:      (serverId, command, commandId) =>
+                        `api/commands/execute?serverId=${serverId}&command=${encodeURIComponent(command)}${commandId ? `&commandId=${commandId}` : ''}`,
     },
     alerts: {
         list:         'api/alerts',

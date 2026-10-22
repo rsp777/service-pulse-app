@@ -245,7 +245,11 @@
                             <h2>Preconfigured Commands</h2>
                             <p style="margin: 4px 0 0; color: var(--muted); font-size: 13.5px;">Reusable command templates executed via authenticated SSH</p>
                         </div>
-                        <div class="service-actions">
+                        <!-- Issue #29: Target server context selector for preconfigured command execution [Author: Ravindra Singh Pawar / Antigravity] -->
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="command-target-server" style="width: 220px;">
+                                <option value="">-- Select Target Server --</option>
+                            </select>
                             <button class="btn secondary" id="refresh-commands">Refresh</button>
                             <button class="btn" id="add-command">+ Add command</button>
                         </div>
@@ -513,11 +517,12 @@
                 <h3>SSH Command</h3>
                 <button class="close" data-close="command-modal">&times;</button>
             </div>
+            <!-- Issue #29: Refactored Template Name and Command String fields [Author: Ravindra Singh Pawar / Antigravity] -->
             <form id="command-crud-form">
                 <input type="hidden" id="command-id">
-                <label for="command-name">Command Name *</label>
+                <label for="command-name">Template Name *</label>
                 <input id="command-name" required placeholder="Check Disk Space">
-                <label for="command-parameters">Command String / Parameters *</label>
+                <label for="command-parameters">Command String *</label>
                 <input id="command-parameters" required placeholder="df -h">
                 <label for="command-description">Description</label>
                 <input id="command-description" placeholder="Checks disk partition usage">

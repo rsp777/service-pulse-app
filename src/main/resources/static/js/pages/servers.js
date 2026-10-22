@@ -51,12 +51,17 @@ function renderServerSelectDropdowns() {
     populate('server-select',       '-- Select a Server --');
     populate('service-server',      '-- Select Server --');
     populate('service-filter-server', 'All Servers');
+    // Issue #29: Populate command target server dropdown [Author: Ravindra Singh Pawar / Antigravity]
+    populate('command-target-server', '-- Select Target Server --');
     populate('alert-server',        'Select Server');
     populate('event-log-server',    'Optional Server');
     populate('path-server',         'Select Server');
 
     if ($('server-select') && state.selectedServer) {
         $('server-select').value = state.selectedServer.id;
+    }
+    if ($('command-target-server') && state.selectedServer) {
+        $('command-target-server').value = state.selectedServer.id;
     }
 }
 
@@ -105,6 +110,8 @@ function renderServersTable() {
 async function selectServer(id) {
     if (!id) {
         state.selectedServer = null;
+        if ($('server-select')) $('server-select').value = '';
+        if ($('command-target-server')) $('command-target-server').value = '';
         if ($('selected-title')) $('selected-title').textContent = 'Select a server';
         if ($('selected-meta')) $('selected-meta').textContent  = 'Choose a server to view and control its services.';
         if ($('service-list'))  $('service-list').innerHTML     = '<div class="empty-state">Select a server to load services.</div>';
@@ -116,6 +123,8 @@ async function selectServer(id) {
 
     state.selectedServer = server;
     if ($('server-select')) $('server-select').value = server.id;
+    // Issue #29: Sync command target server dropdown with selected server [Author: Ravindra Singh Pawar / Antigravity]
+    if ($('command-target-server')) $('command-target-server').value = server.id;
 
     if ($('selected-title')) {
         $('selected-title').textContent = server.hostname || server.ipAddress;

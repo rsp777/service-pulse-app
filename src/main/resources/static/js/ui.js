@@ -82,3 +82,16 @@ function renderTable(container, headers, rows, emptyMsg = 'No data available.', 
         });
     });
 }
+
+// Issue #29: Format ISO date string into readable timestamp [Author: Ravindra Singh Pawar / Antigravity]
+function formatDttm(dttmStr) {
+    if (!dttmStr) return '-';
+    try {
+        const d = new Date(dttmStr);
+        if (isNaN(d.getTime())) return dttmStr;
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' + d.toLocaleDateString();
+    } catch {
+        return dttmStr;
+    }
+}
+

@@ -7,6 +7,7 @@ import { CommandModalComponent } from '../components/CommandModalComponent';
  */
 export class CommandsPage extends BasePage {
   readonly heading: Locator;
+  readonly targetServerSelect: Locator;
   readonly refreshButton: Locator;
   readonly addCommandButton: Locator;
   readonly commandTable: Locator;
@@ -15,6 +16,8 @@ export class CommandsPage extends BasePage {
   constructor(page: Page) {
     super(page);
     this.heading = page.getByRole('heading', { name: 'Preconfigured Commands', level: 2 });
+    // Issue #29: Target server context selector locator [Author: Ravindra Singh Pawar / Antigravity]
+    this.targetServerSelect = page.locator('#command-target-server');
     this.refreshButton    = page.getByRole('button', { name: 'Refresh' }).first();
     this.addCommandButton = page.getByRole('button', { name: '+ Add command' }).first();
     this.commandTable     = page.locator('#command-table');
