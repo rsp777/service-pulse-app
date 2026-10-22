@@ -178,4 +178,19 @@ public class ManageServicesController {
 		}
 	}
 
+	// Issue #30: On-demand tiered health evaluation endpoint [Author: Ravindra Singh Pawar / Antigravity]
+	@PostMapping("/evaluate-service-health")
+	public ResponseEntity<ApiResponse<Boolean>> evaluateServiceHealth(
+			@RequestParam Integer serverId,
+			@RequestParam Integer serviceId) {
+		try {
+			boolean isUp = manageServices.evaluateServiceHealth(serverId, serviceId);
+			return ResponseEntity.ok(new ApiResponse<>(true, isUp ? "Service is UP" : "Service is DOWN", isUp));
+		} catch (Exception ex) {
+			logger.error("Error evaluating service health for serverId={}, serviceId={}", serverId, serviceId, ex);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(new ApiResponse<>(false, "Failed to evaluate service health: " + ex.getMessage(), null));
+		}
+	}
+
 }

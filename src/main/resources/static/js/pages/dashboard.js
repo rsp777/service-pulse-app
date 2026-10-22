@@ -43,6 +43,12 @@ function getServiceHealthUrl(service) {
 
 async function loadServices() {
     if (!state.selectedServer) return;
+    try {
+        const persisted = unwrap(await apiRequest(API.services.healthStatus(state.selectedServer.id), { silent: true })) || [];
+        state.healthStatuses = Object.fromEntries(persisted.map((item) => [item.service?.id, item.status]));
+    } catch {
+        // preserve existing state.healthStatuses
+    }
     const services    = state.selectedServer.services || [];
     const hasMultiple = services.length > 1;
 
@@ -109,8 +115,15 @@ async function updateServiceRuntime(service) {
     const versionEl   = $(`version-${service.id}`);
     const indicatorEl = $(`indicator-${service.id}`);
 
+    // Issue #30: If health check URL is unconfigured, synchronize indicator with persisted host health status [Author: Ravindra Singh Pawar / Antigravity]
     if (!healthUrl) {
         if (versionEl) versionEl.textContent = '—';
+        const persisted = state.healthStatuses[service.id];
+        if (indicatorEl && persisted) {
+            const isOnline = persisted === 'ONLINE' || persisted === 'UP';
+            indicatorEl.className = `status ${isOnline ? 'online' : 'offline'}`;
+            indicatorEl.innerHTML = `<span class="pulse-dot"></span>${escapeHtml(persisted)}`;
+        }
         return;
     }
 

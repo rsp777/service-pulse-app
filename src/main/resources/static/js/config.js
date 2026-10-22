@@ -52,6 +52,9 @@ const API = {
         // Issue #27: All server configs and runtime status endpoints [Author: Ravindra Singh Pawar / Antigravity]
         serverServiceConfigsAll: 'api/server-service-configurations',
         runtimeStatus:           'api/services/runtime-status',
+        // Issue #30: On-demand tiered health evaluation endpoint [Author: Ravindra Singh Pawar / Antigravity]
+        evaluateHealth:          (serverId, serviceId) =>
+                                    `api/manage-services/evaluate-service-health?serverId=${serverId}&serviceId=${serviceId}`,
     },
     commands: {
         list:         'api/commands',

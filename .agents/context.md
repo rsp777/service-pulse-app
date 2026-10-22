@@ -116,6 +116,12 @@ The application has fully evolved from static disk-based SSH keys to **Keyless S
    - Enforced server selection validation with user prompt notice before execution.
    - Reusable command execution via `POST /api/commands/execute?commandId=N`, updating execution timestamp, exit code (`0` for COMPLETED, `1` for FAILED), and output streaming to dashboard console.
    - Certified with 6 JUnit 5 tests (`CommandControllerTest`) and 21 Playwright cross-browser tests covering positive (+ve) and negative (-ve) paths. Merged to `dev`, closed Issue #29.
+12. **Tiered Service Health Evaluation & Live Log State Synchronization (#30):**
+   - Implemented Tier 1 probe: HTTP `200 OK` or Spring Actuator `"status": "UP"` when `Health Check URL` is configured.
+   - Implemented Tier 2 probe: Remote host process and systemd verification (`systemctl is-active` or `pgrep -f`) via SSH when `Health Check URL` is blank, ensuring active processes streaming logs are not falsely reported as `DOWN`.
+   - Added on-demand health evaluation API endpoint `POST /api/manage-services/evaluate-service-health`.
+   - Synchronized dashboard status badge and service refresh logic.
+   - Certified with 13 JUnit 5 unit tests (`ManageServicesImplTest`), 3 controller tests (`ManageServicesControllerTest`), and 24 Playwright cross-browser tests covering positive and negative paths. Merged to `dev`, closed Issue #30.
 
 ---
 
