@@ -39,7 +39,7 @@
   - Hibernate Dialect: `org.hibernate.dialect.MySQLDialect`
   - Migration Tool: **Liquibase** (`src/main/resources/db/changelog/db.changelog-master.xml` invoking `sql/V1__init.sql`)
   - Active Core Tables (with `BIGINT AUTO_INCREMENT` PKs):
-    - `server`: Stores managed target servers (`id`, `hostname`, `ip_address`, `os_type`, `status`, `last_health_checked`).
+    - `server`: Stores managed target servers (`id`, `hostname`, `ip_address`, `os_type`, `status`, `last_health_checked`, `ssh_port`, `ssh_username`, `ssh_key_id`).
     - `service`: Catalog of monitored services (`id`, `service_name`).
     - `server_service`: Many-to-many junction between servers and services.
     - `server_service_configuration`: Runtime configuration (`actuator_port`, `context_path`, `health_check_url`, `logs_path`, `scripts_path`, `status`).
@@ -48,6 +48,11 @@
     - `health_check`, `http_methods`, `path`, `script`, `server_path`, `path_script`.
     - `alert_configuration`, `alert_event`, `alert_condition_type`, `alert_condition_mapping`, `alert_event_log`.
     - `application_configuration`, `ui_actions`.
+- **Server SSH Configuration & Connectivity (Issue #26 :white_check_mark:):**
+  - Added `ssh_port` (default 22), `ssh_username` (default 'ubuntu'), and `ssh_key_id` to `server` entity and Liquibase changeset `2-add-server-ssh-fields`.
+  - Removed manual static status select from Add/Edit Server modal, dynamically relying on health polling.
+  - Implemented live SSH connectivity testing via `POST /api/servers/test-connection` and `POST /api/servers/{id}/test-connection` with real-time UI status feedback.
+  - Certified with 13 JUnit 5 unit tests and 30 cross-browser Playwright E2E tests (+ve & -ve).
 - **Roadmap Target (PostgreSQL & UUID PKs):**
   - Planned migration for cloud-native distributed scaling: migrate primary keys from `BIGINT AUTO_INCREMENT` to `UUID` to prevent ID collisions in distributed multi-region sync.
   - PostgreSQL schema definitions for `ssh_key_pairs`, `server_key_assignments`, and `shedlock`.
