@@ -103,29 +103,35 @@ async function loadServices() {
     services.forEach((s) => updateServiceRuntime(s));
 }
 
+// Issue #27: Proxied runtime status endpoint for robust Actuator parsing [Author: Ravindra Singh Pawar / Antigravity]
 async function updateServiceRuntime(service) {
     const healthUrl = getServiceHealthUrl(service);
-    if (!healthUrl) return;
-
-    const baseUrl = healthUrl.replace(/\/actuator\/health\/?$/, '');
     const versionEl   = $(`version-${service.id}`);
     const indicatorEl = $(`indicator-${service.id}`);
 
+    if (!healthUrl) {
+        if (versionEl) versionEl.textContent = '—';
+        return;
+    }
+
     try {
-        const health = await fetch(`${baseUrl}/actuator/health`, { signal: AbortSignal.timeout(4000) });
-        if (indicatorEl) {
-            indicatorEl.className = `status ${health.ok ? 'online' : 'offline'}`;
-            indicatorEl.innerHTML = `<span class="pulse-dot"></span>${health.ok ? 'ONLINE' : 'OFFLINE'}`;
-        }
-        const info = await fetch(`${baseUrl}/actuator/info`, { signal: AbortSignal.timeout(4000) });
-        if (info.ok && versionEl) {
-            const data = await info.json();
-            versionEl.textContent = data?.build?.version || data?.build?.project?.version || 'Active';
+        const res = await apiRequest(`${API.services.runtimeStatus}?url=${encodeURIComponent(healthUrl)}`, { silent: true });
+        if (res && res.status) {
+            if (indicatorEl) {
+                const isOnline = res.status === 'ONLINE' || res.status === 'UP';
+                indicatorEl.className = `status ${isOnline ? 'online' : 'offline'}`;
+                indicatorEl.innerHTML = `<span class="pulse-dot"></span>${isOnline ? 'ONLINE' : 'OFFLINE'}`;
+            }
+            if (versionEl) {
+                versionEl.textContent = res.version || 'Unknown';
+            }
         }
     } catch {
-        if (indicatorEl) {
-            indicatorEl.className = 'status offline';
-            indicatorEl.innerHTML = '<span class="pulse-dot"></span>OFFLINE';
+        const persisted = state.healthStatuses[service.id];
+        if (indicatorEl && persisted) {
+            const isOnline = persisted === 'ONLINE' || persisted === 'UP';
+            indicatorEl.className = `status ${isOnline ? 'online' : 'offline'}`;
+            indicatorEl.innerHTML = `<span class="pulse-dot"></span>${escapeHtml(persisted)}`;
         }
     }
 }

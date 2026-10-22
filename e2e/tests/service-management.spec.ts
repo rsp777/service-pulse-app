@@ -18,22 +18,27 @@ test.describe('Service Application Management & Modals', () => {
     await expect(servicesPage.serviceModal.modal).toHaveClass(/active/);
     await expect(servicesPage.serviceModal.heading).toBeVisible();
 
-    // Verify accessible inputs
+    // Issue #27: Verify accessible inputs including healthCheckUrl and actuator fields [Author: Ravindra Singh Pawar / Antigravity]
     await expect(servicesPage.serviceModal.targetServerSelect).toBeVisible();
     await expect(servicesPage.serviceModal.serviceNameInput).toBeVisible();
     await expect(servicesPage.serviceModal.serviceTypeSelect).toBeVisible();
+    await expect(servicesPage.serviceModal.healthCheckUrlInput).toBeVisible();
     await expect(servicesPage.serviceModal.logsPathInput).toBeVisible();
     await expect(servicesPage.serviceModal.scriptsPathInput).toBeVisible();
 
-    // Fill service details
+    // Fill service details including Health Check URL
     await servicesPage.serviceModal.fill({
       serviceName: 'auth-service',
       serviceType: 'SPRING_BOOT',
+      actuatorPort: 8080,
+      contextPath: '/auth',
+      healthCheckUrl: 'http://100.87.125.44:8080/auth/actuator/health',
       logsPath: '/opt/apps/logs/auth-service',
       scriptsPath: '/opt/apps/scripts'
     });
 
     await expect(servicesPage.serviceModal.serviceNameInput).toHaveValue('auth-service');
+    await expect(servicesPage.serviceModal.healthCheckUrlInput).toHaveValue('http://100.87.125.44:8080/auth/actuator/health');
     await expect(servicesPage.serviceModal.logsPathInput).toHaveValue('/opt/apps/logs/auth-service');
 
     // Cancel and ensure modal closes

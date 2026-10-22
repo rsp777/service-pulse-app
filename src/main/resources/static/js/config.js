@@ -49,6 +49,9 @@ const API = {
                         `api/logs/stream?serverId=${serverId}&serviceId=${serviceId}`,
         serverServiceConfigs: (serverId) =>
                         `api/server-service-configurations/server/${serverId}`,
+        // Issue #27: All server configs and runtime status endpoints [Author: Ravindra Singh Pawar / Antigravity]
+        serverServiceConfigsAll: 'api/server-service-configurations',
+        runtimeStatus:           'api/services/runtime-status',
     },
     commands: {
         list:         'api/commands',
