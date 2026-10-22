@@ -1,20 +1,27 @@
 package com.pawar.todo.amt.ssh;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import com.pawar.app.healthcheck.dto.ConnectionTestResult;
 import com.pawar.app.healthcheck.dto.ServerResponseDto;
+import com.pawar.todo.amt.ssh.audit.SshSecurityAuditLogger;
+import com.pawar.todo.amt.ssh.auth.SshAuthMode;
+import com.pawar.todo.amt.ssh.auth.SshCredentialProvider;
+import com.pawar.todo.amt.ssh.auth.StaticKeyCredentialProvider;
+import com.pawar.todo.amt.ssh.verifier.HostCertificateVerifier;
 
 import net.schmizz.sshj.SSHClient;
 import net.schmizz.sshj.connection.channel.direct.Session;
@@ -27,15 +34,45 @@ public class SshCommandService {
 
 	private static final Logger logger = LoggerFactory.getLogger(SshCommandService.class);
 	private final SshProperties properties;
+	private final SshCredentialProvider credentialProvider;
+	private final SshSecurityAuditLogger auditLogger;
+
+	public SshCommandService() {
+		this(new SshProperties());
+	}
 
 	public SshCommandService(SshProperties properties) {
-		this.properties = properties;
+		this(properties, new StaticKeyCredentialProvider(properties), new SshSecurityAuditLogger());
+	}
+
+	public SshCommandService(SshProperties properties, SshCredentialProvider credentialProvider) {
+		this(properties, credentialProvider, new SshSecurityAuditLogger());
+	}
+
+	@Autowired
+	public SshCommandService(SshProperties properties, SshCredentialProvider credentialProvider, SshSecurityAuditLogger auditLogger) {
+		this.properties = properties != null ? properties : new SshProperties();
+		this.credentialProvider = credentialProvider != null ? credentialProvider : new StaticKeyCredentialProvider(this.properties);
+		this.auditLogger = auditLogger != null ? auditLogger : new SshSecurityAuditLogger();
+	}
+
+	public SshCredentialProvider getCredentialProvider() {
+		return credentialProvider;
+	}
+
+	public SshSecurityAuditLogger getAuditLogger() {
+		return auditLogger;
 	}
 
 	public String execute(ServerResponseDto server, String command) throws IOException {
 		String host = resolveHost(server);
-		logger.info("Starting SSH command on {} as {} (length={})", host, properties.getUsername(),
+		String username = (server != null && StringUtils.hasText(server.sshUsername()))
+				? server.sshUsername().trim()
+				: (StringUtils.hasText(properties.getUsername()) ? properties.getUsername().trim() : "ubuntu");
+		long startTime = System.currentTimeMillis();
+		logger.info("Starting SSH command on {} as {} (length={})", host, username,
 				command == null ? 0 : command.length());
+		auditLogger.logSessionStart(host, username, credentialProvider.getMetadata(), command);
 
 		try (SSHClient client = connect(server);
 				Session session = client.startSession();
@@ -46,6 +83,8 @@ public class SshCommandService {
 
 			// 2. Check if the channel is still open (indicates timeout)
 			if (remoteCommand.isOpen()) {
+				long duration = System.currentTimeMillis() - startTime;
+				auditLogger.logSessionFailure(host, properties.getUsername(), "Command timed out", duration);
 				throw new IOException(String.format("Command timed out after %d seconds on %s",
 						properties.getCommandTimeoutSeconds(), host));
 			}
@@ -54,10 +93,12 @@ public class SshCommandService {
 			String output = new String(remoteCommand.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
 			String error = new String(remoteCommand.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
 			Integer exitStatus = remoteCommand.getExitStatus();
+			long duration = System.currentTimeMillis() - startTime;
 
 			if (exitStatus == null || exitStatus != 0) {
 				String errorDetails = StringUtils.hasText(error) ? error.trim() : "Exit code: " + exitStatus;
 				logger.error("Remote command failed on {}: {}", host, errorDetails);
+				auditLogger.logSessionFailure(host, properties.getUsername(), errorDetails, duration);
 				if (errorDetails.contains("No such file or directory") || errorDetails.contains("not found")) {
 					throw new IOException("SCRIPTS_UNAVAILABLE: Required script is unavailable on " + host + ": "
 							+ errorDetails);
@@ -65,13 +106,15 @@ public class SshCommandService {
 				throw new IOException("Remote command failed: " + errorDetails);
 			}
 
-			logger.info("SSH command completed on {} with {} output characters", host, output.length());
+			auditLogger.logSessionEnd(host, username, exitStatus, duration);
+			logger.info("SSH command completed on {} with {} output characters in {}ms", host, output.length(), duration);
 			return output;
 		}
 		catch(Exception e) {
+			long duration = System.currentTimeMillis() - startTime;
+			auditLogger.logSessionFailure(host, properties.getUsername(), e.getMessage(), duration);
 			logger.error("SSH command failed on {}: {}", host, e.getMessage(), e);
 			throw new IOException("Error executing command: " + e.getMessage(), e);
-
 		}
 	}
 
@@ -84,11 +127,41 @@ public class SshCommandService {
 		}
 	}
 
+	// Issue #26: Test SSH connectivity to target server [Author: Ravindra Singh Pawar / Antigravity]
+	public ConnectionTestResult testConnection(ServerResponseDto server) {
+		String host = (server != null && StringUtils.hasText(server.ipAddress())) ? server.ipAddress()
+				: ((server != null && StringUtils.hasText(server.hostname())) ? server.hostname() : "unknown");
+		int port = (server != null && server.sshPort() != null && server.sshPort() > 0)
+				? server.sshPort()
+				: ((properties.getPort() != 0 && properties.getPort() > 0) ? properties.getPort() : 22);
+		String username = (server != null && StringUtils.hasText(server.sshUsername()))
+				? server.sshUsername().trim()
+				: (StringUtils.hasText(properties.getUsername()) ? properties.getUsername().trim() : "ubuntu");
+
+		try {
+			host = resolveHost(server);
+			try (SSHClient client = connect(server)) {
+				if (client.isConnected() && client.isAuthenticated()) {
+					return new ConnectionTestResult(true, String.format("SSH connection and authentication successful to %s:%d as user '%s'", host, port, username));
+				}
+				return new ConnectionTestResult(false, String.format("Connected to %s:%d, but authentication failed for user '%s'", host, port, username));
+			}
+		} catch (Exception e) {
+			logger.warn("SSH connection test failed for {}:{}: {}", host, port, e.getMessage());
+			return new ConnectionTestResult(false, String.format("Connection to %s:%d failed: %s", host, port, e.getMessage()));
+		}
+	}
+
 	public void stream(ServerResponseDto server, String command, Consumer<String> lineConsumer,
 			AtomicBoolean stopped) throws IOException {
 		String host = resolveHost(server);
-		logger.info("Starting SSH log stream on {} as {} (command length={})", host, properties.getUsername(),
+		String username = (server != null && StringUtils.hasText(server.sshUsername()))
+				? server.sshUsername().trim()
+				: (StringUtils.hasText(properties.getUsername()) ? properties.getUsername().trim() : "ubuntu");
+		logger.info("Starting SSH log stream on {} as {} (command length={})", host, username,
 				command == null ? 0 : command.length());
+		auditLogger.logSessionStart(host, username, credentialProvider.getMetadata(), command);
+		long startTime = System.currentTimeMillis();
 
 		try (SSHClient client = connect(server);
 				Session session = client.startSession();
@@ -113,22 +186,29 @@ public class SshCommandService {
 					}
 				}
 			}
+			long duration = System.currentTimeMillis() - startTime;
 			if (!stopped.get()) {
 				String error = new String(remoteCommand.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
 				Integer exitStatus = remoteCommand.getExitStatus();
 				if (exitStatus == null || exitStatus != 0) {
 					String errorDetails = StringUtils.hasText(error) ? error : "Exit code: " + exitStatus;
+					auditLogger.logSessionFailure(host, properties.getUsername(), errorDetails, duration);
 					if (errorDetails.contains("No such file or directory") || errorDetails.contains("not found")) {
 						throw new IOException("SCRIPTS_UNAVAILABLE: Required script is unavailable on " + host + ": "
 								+ errorDetails);
 					}
 					throw new IOException("Remote command failed: " + errorDetails);
 				}
+				auditLogger.logSessionEnd(host, properties.getUsername(), exitStatus, duration);
+			} else {
+				auditLogger.logSessionEnd(host, properties.getUsername(), 0, duration);
 			}
 			remoteCommand.close();
 			logger.info("SSH log stream completed for {}", host);
 		} catch (IOException exception) {
+			long duration = System.currentTimeMillis() - startTime;
 			if (!stopped.get()) {
+				auditLogger.logSessionFailure(host, properties.getUsername(), exception.getMessage(), duration);
 				logger.error("SSH log stream failed for {}: {}", host, exception.getMessage(), exception);
 				throw exception;
 			}
@@ -147,19 +227,19 @@ public class SshCommandService {
 			client.setConnectTimeout(properties.getConnectTimeoutMillis());
 
 			String host = resolveHost(server);
-			int port = (properties.getPort() != 0 && properties.getPort() > 0) ? properties.getPort() : 22;
+			// Issue #26: Use server-specific SSH port and username [Author: Ravindra Singh Pawar / Antigravity]
+			int port = (server != null && server.sshPort() != null && server.sshPort() > 0)
+					? server.sshPort()
+					: ((properties.getPort() != 0 && properties.getPort() > 0) ? properties.getPort() : 22);
 
 			client.connect(host, port);
 
-			// Load Private Key
-			KeyProvider keyProvider;
-			if (StringUtils.hasText(properties.getPrivateKeyPassphrase())) {
-				keyProvider = client.loadKeys(properties.getPrivateKeyPath(), properties.getPrivateKeyPassphrase());
-			} else {
-				keyProvider = client.loadKeys(properties.getPrivateKeyPath());
-			}
-
-			client.authPublickey(properties.getUsername(), keyProvider);
+			// Load key or certificate through credential provider SPI
+			KeyProvider keyProvider = credentialProvider.getKeyProvider(client);
+			String username = (server != null && StringUtils.hasText(server.sshUsername()))
+					? server.sshUsername().trim()
+					: (StringUtils.hasText(properties.getUsername()) ? properties.getUsername().trim() : "ubuntu");
+			client.authPublickey(username, keyProvider);
 			return client;
 
 		} catch (IOException exception) {
@@ -169,19 +249,41 @@ public class SshCommandService {
 	}
 
 	private void configureHostKeyVerifier(SSHClient client) throws IOException {
-		// If knownHostsPath is specified and strict checking is enabled, load
-		// known_hosts
-		if (properties.isStrictHostKeyChecking() && StringUtils.hasText(properties.getKnownHostsPath())) {
-			File knownHosts = new File(properties.getKnownHostsPath());
-			if (knownHosts.exists()) {
-				client.loadKnownHosts(knownHosts);
-				return;
+		if (properties.isStrictHostKeyChecking()) {
+			boolean verifierConfigured = false;
+
+			// 1. If Host CA public key is provided, register HostCertificateVerifier
+			if (StringUtils.hasText(properties.getHostCaPublicKey())) {
+				client.addHostKeyVerifier(new HostCertificateVerifier(properties.getHostCaPublicKey()));
+				verifierConfigured = true;
+				logger.info("Configured HostCertificateVerifier with trusted Host CA");
 			}
-			logger.warn("known_hosts file not found at {}. Falling back to PromiscuousVerifier.",
-					properties.getKnownHostsPath());
+
+			// 2. If knownHostsPath is specified, load known_hosts
+			if (StringUtils.hasText(properties.getKnownHostsPath())) {
+				String path = properties.getKnownHostsPath().trim().replace("/\\", "/").replace("\\/", "/");
+				if (path.startsWith("~")) {
+					path = System.getProperty("user.home") + path.substring(1);
+				}
+				File knownHosts = new File(path);
+				if (knownHosts.exists()) {
+					client.loadKnownHosts(knownHosts);
+					verifierConfigured = true;
+					logger.info("Loaded known_hosts from {}", path);
+				} else {
+					logger.warn("known_hosts file not found at {}", path);
+				}
+			}
+
+			// 3. Fail fast if strict checking is enabled but neither Host CA nor known_hosts is configured
+			if (!verifierConfigured) {
+				throw new SecurityException("Strict host-key verification is enabled, but neither Host CA nor known_hosts is configured.");
+			}
+			return;
 		}
 
-		// Trust all host keys (resolves the ed25519 TransportException)
+		// Fallback for non-strict environments (local/dev/test)
+		logger.warn("Strict host-key verification is DISABLED. PromiscuousVerifier is active. This is insecure for production.");
 		client.addHostKeyVerifier(new PromiscuousVerifier());
 	}
 
@@ -197,8 +299,11 @@ public class SshCommandService {
 	}
 
 	private void validateConfiguration() throws IOException {
-		if (!StringUtils.hasText(properties.getUsername()) || !StringUtils.hasText(properties.getPrivateKeyPath())) {
-			throw new IOException("SSH_USERNAME and SSH_PRIVATE_KEY_PATH must be configured");
+		if (!StringUtils.hasText(properties.getUsername())) {
+			throw new IOException("SSH_USERNAME must be configured");
+		}
+		if (properties.getAuthMode() == SshAuthMode.STATIC && !StringUtils.hasText(properties.getPrivateKeyPath())) {
+			throw new IOException("SSH_PRIVATE_KEY_PATH must be configured when using STATIC auth mode");
 		}
 	}
 }

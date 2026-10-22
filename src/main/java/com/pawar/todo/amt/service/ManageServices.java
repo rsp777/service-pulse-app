@@ -21,8 +21,7 @@ public interface ManageServices {
 	public void streamAllServices(Integer serverId, String action, Consumer<String> lineConsumer, AtomicBoolean stopped)
 			throws ServerOperationException, IOException, PathOperationException, ResourceNotFoundException,
 			ServiceHealthStatusOperationException, InterruptedException, ExecutionException;
+	// Issue #30: Tiered health evaluation method [Author: Ravindra Singh Pawar / Antigravity]
+	public boolean evaluateServiceHealth(Integer serverId, Integer serviceId) throws ServerOperationException, ResourceNotFoundException;
 	public void periodicServiceHealthCheck();
-	
-
-	
 }

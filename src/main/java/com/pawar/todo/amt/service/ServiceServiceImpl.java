@@ -117,13 +117,19 @@ public class ServiceServiceImpl implements ServiceService {
 				service.setServers(servers);
 			}
 			service.setServiceName(request.serviceName());
+			// Issue #27/#31: Persist serviceType and healthCheckUrl on create [Author: Ravindra Singh Pawar / Antigravity]
+			if (request.serviceType() != null && !request.serviceType().isBlank()) {
+				service.setServiceType(request.serviceType());
+			} else {
+				service.setServiceType("SPRING_BOOT");
+			}
 			service.setCreatedSource(request.createdSource());
 			service.setLastUpdatedSource(request.lastUpdatedSource());
 			service.setCreatedDttm(LocalDateTime.now());
 			service.setLastUpdatedDttm(LocalDateTime.now());
 			logger.info("service : {}",service);
 			com.pawar.todo.amt.model.Service savedService = serviceRepository.save(service);
-			upsertServerConfigurations(savedService, servers, null);
+			upsertServerConfigurations(savedService, servers, request.healthCheckUrl());
 			logger.debug("Service created successfully: ID={}", savedService.getId());
 			if (savedService != null) {
 				for (Server server : servers) {
@@ -221,7 +227,12 @@ public class ServiceServiceImpl implements ServiceService {
 				service.setServers(servers);
 			}
 			service.setServiceName(request.serviceName());
-			upsertServerConfigurations(service, requestedServers, null);
+			// Issue #27/#31: Update serviceType and healthCheckUrl on update [Author: Ravindra Singh Pawar / Antigravity]
+			if (request.serviceType() != null && !request.serviceType().isBlank()) {
+				service.setServiceType(request.serviceType());
+			}
+			Set<Server> targetServers = (requestedServers != null && !requestedServers.isEmpty()) ? requestedServers : servers;
+			upsertServerConfigurations(service, targetServers, request.healthCheckUrl());
 			service.setLastUpdatedDttm(LocalDateTime.now());
 
 			com.pawar.todo.amt.model.Service updatedService = serviceRepository.save(service);
@@ -243,7 +254,9 @@ public class ServiceServiceImpl implements ServiceService {
 					.orElseGet(ServerServiceConfiguration::new);
 			configuration.setServer(server);
 			configuration.setService(service);
-			configuration.setHealthCheckUrl(healthCheckUrl);
+			if (healthCheckUrl != null) {
+				configuration.setHealthCheckUrl(healthCheckUrl);
+			}
 			configuration.setCreatedSource(service.getCreatedSource());
 			configuration.setLastUpdatedSource(service.getLastUpdatedSource());
 			serverServiceConfigurationRepository.save(configuration);

@@ -23,6 +23,7 @@ public interface ServerService {
 	 public ListenableFuture<Void> deleteServerAsync(Integer id) throws ServerOperationException;
 	 public List<ServerResponseDto> findServersByStatus(ServerStatus status) throws ServerOperationException;
 
-	
-	
+	 // Issue #26: Test SSH connection to target server [Author: Ravindra Singh Pawar / Antigravity]
+	 public com.pawar.app.healthcheck.dto.ConnectionTestResult testConnection(ServerRequestDto serverRequestDto);
+	 public com.pawar.app.healthcheck.dto.ConnectionTestResult testConnection(Integer serverId) throws ServerOperationException;
 }

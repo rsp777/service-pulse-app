@@ -1,69 +1,166 @@
-version: '3.8'
-
 services:
-  monitor-db:
-    image: postgres:latest
-    container_name: monitor-db
+  db:
+    image: mysql:8.0
+    container_name: service-pulse-db
+    restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: ravi
+      MYSQL_ROOT_PASSWORD: ravi
+      MYSQL_DATABASE: service-pulse-app
+      MYSQL_USER: ravi
+      MYSQL_PASSWORD: ravi
     ports:
-      - "5432:5432"
+      - "3306:3306"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - mysql_data:/var/lib/mysql
     networks:
-      - monitor-net
+      - service-pulse-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "ravi", "-pravi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  db-migrate:
-    image: liquibase/liquibase:4.25
-    container_name: db-migrate
-    volumes:
-      - ./db/changelog:/liquibase/changelog
-      - ./liquibase.properties:/liquibase/liquibase.properties
-    command: update --changelog-file=db.changelog-master.xml --url=jdbc:postgresql://monitor-db:5432/postgres --username=postgres --password=ravi
-    depends_on:
-      - monitor-db
-    networks:
-      - monitor-net
-
-  collector:
-    build: ./collector
-    container_name: service-collector
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      monitor-db:
-        condition: service_started
-    environment:
-      datasource.url: jdbc:postgresql://monitor-db:5432/postgres
-      datasource.username: postgres
-      datasource.password: ravi
-      poller.interval: 60s
-    networks:
-      - monitor-net
-
-  dashboard:
-    build: ./dashboard
-    container_name: service-dashboard
+  vault:
+    image: hashicorp/vault:latest
+    container_name: service-pulse-vault
+    restart: unless-stopped
     ports:
-      - "3000:3000"
-    depends_on:
-      db-migrate:
-        condition: service_completed_successfully
-      monitor-db:
-        condition: service_started
+      - "8200:8200"
     environment:
-      DB_HOST: monitor-db
-      DB_PORT: 5432
-      DB_USER: postgres
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - service-pulse-net
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8200"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  vault-init:
+    image: hashicorp/vault:latest
+    container_name: service-pulse-vault-init
+    restart: "no"
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "Configuring Vault SSH Secrets Engine..."
+        vault secrets enable -path=ssh ssh || true
+        vault write ssh/config/ca generate_signing_key=true || true
+        vault write ssh/roles/servicepulse-runner \
+          key_type=ca \
+          allowed_users="ravi,ubuntu,ec2-user,servicepulse" \
+          default_user="ravi" \
+          ttl="1h" \
+          allow_user_certificates=true
+        echo "Vault SSH CA configured successfully!"
+    networks:
+      - service-pulse-net
+
+  service-pulse-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: service-pulse-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      # Server & Application Configuration
+      SERVER_PORT: 9092
+      SERVER_SERVLET_CONTEXT_PATH: /service-pulse-app
+      SPRING_APPLICATION_NAME: service-pulse-app
+      SPRING_MAIN_BANNER_MODE: "OFF"
+
+      # Database & DataSource Configuration
+      DB_URL: jdbc:mysql://db:3306/service-pulse-app?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: ravi
       DB_PASSWORD: ravi
-      DB_NAME: postgres
-      COLLECTOR_URL: http://service-collector:8080
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 10
+      HIKARI_MAX_POOL_SIZE: 30000
+
+      # JPA & Hibernate Configuration
+      SPRING_JPA_SHOW_SQL: "false"
+      JPA_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQLDialect
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: INFO
+      LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND: WARN
+
+      # Liquibase Configuration
+      LIQUIBASE_ENABLED: "true"
+      SPRING_LIQUIBASE_CHANGE_LOG: classpath:db/changelog/db.changelog-master.xml
+
+      # Timeout Settings
+      CONNECTION_TIMEOUT: 20
+      RESPONSE_TIMEOUT: 20
+      CONNECTION_REQUEST_TIMEOUT: 20
+
+      # Healthcheck, Service Management & Alerts
+      HEALTHCHECK_ENABLED: "true"
+      HEALTHCHECK_CRON: "0 0/1 * * * *"
+      SERVICE_MANAGEMENT_ENABLED: "true"
+      ALERT_MANAGEMENT_ENABLED: "true"
+      ALERT_CRON: "0 0/1 * * * *"
+      BACKFILL_DATA_POPULATE_ENABLED: "false"
+
+      # Spring Framework & Jackson
+      SPRING_JMX_ENABLED: "true"
+      SPRING_ALLOW_BEAN_DEFINITION_OVERRIDING: "true"
+      SPRING_ALLOW_CIRCULAR_REFERENCES: "true"
+      SPRING_JACKSON_SERIALIZATION_WRITE_DATES_AS_TIMESTAMPS: "false"
+      SPRING_JACKSON_DATE_FORMAT: "yyyy-MM-dd'T'HH:mm:ssZ"
+
+      # Actuator & Management Endpoints
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "*"
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: always
+      MANAGEMENT_ENDPOINT_SHUTDOWN_ENABLED: "true"
+      MANAGEMENT_INFO_ENV_ENABLED: "true"
+      MANAGEMENT_ENDPOINTS_WEB_CORS_ALLOWED_ORIGINS: "*"
+
+      # SSH Authentication & Connection
+      SSH_USERNAME: ravi
+      SSH_AUTH_MODE: CA_CERTIFICATE
+      SSH_STRICT_HOST_KEY_CHECKING: "false"
+      SSH_PORT: 22
+      SSH_CONNECT_TIMEOUT_MILLIS: 10000
+      SSH_COMMAND_TIMEOUT_SECONDS: 120
+      SSH_HOST_CA_PUBLIC_KEY: ""
+
+      # SSH CA (HashiCorp Vault)
+      SSH_CA_TYPE: VAULT
+      SSH_CA_ENDPOINT: http://vault:8200
+      SSH_CA_TOKEN: root
+      SSH_CA_ROLE: servicepulse-runner
+      SSH_CA_MOUNT: ssh
+      SSH_CA_PRINCIPALS: ravi,ubuntu,ec2-user,servicepulse
+      SSH_CA_KEY_ALGORITHM: ED25519
+      SSH_CA_CERT_TTL_MINUTES: 60
+      SSH_CA_RENEW_THRESHOLD_PERCENTAGE: 75
+
+      # Fallback Static SSH Key Configuration
+      SSH_PRIVATE_KEY_PATH: C:/Users/Ravi/.ssh/id_ed25519_auth_wms
+      SSH_PRIVATE_KEY_PASSPHRASE: sshpassphrase
+      SSH_KNOWN_HOSTS_PATH: C:/Users/Ravi/.ssh/known_hosts
     networks:
-      - monitor-net
+      - service-pulse-net
 
 networks:
-  monitor-net:
+  service-pulse-net:
     driver: bridge
 
 volumes:
-  postgres_data:
+  mysql_data:
