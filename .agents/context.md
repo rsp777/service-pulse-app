@@ -53,6 +53,13 @@
   - Removed manual static status select from Add/Edit Server modal, dynamically relying on health polling.
   - Implemented live SSH connectivity testing via `POST /api/servers/test-connection` and `POST /api/servers/{id}/test-connection` with real-time UI status feedback.
   - Certified with 13 JUnit 5 unit tests and 30 cross-browser Playwright E2E tests (+ve & -ve).
+- **Service Application Health Check URL & Live Configuration (Issue #27 :white_check_mark:):**
+  - Added `healthCheckUrl`, `actuatorPort`, and `contextPath` input controls to the Service Application modal (`index.html`, `services.js`).
+  - Added automatic Spring Boot Actuator URL derivation helper with dynamic binding on port/context path/server selection changes and manual override support.
+  - Added backend endpoint `GET /api/server-service-configurations` in `ServerServiceConfigurationController.java` to fetch all runtime configurations cross-server.
+  - Updated Service Registry table in `services.js` to populate the `HEALTH CHECK URL` column with live configuration data across all servers.
+  - Updated `dashboard.js` to route live actuator health and version queries through the secure backend proxy (`GET /api/services/runtime-status?url=...`), preventing browser CORS errors.
+  - Certified with 6 JUnit 5 unit tests and 27 cross-browser Playwright E2E tests across Chromium, Firefox, and WebKit (+ve & -ve).
 - **Roadmap Target (PostgreSQL & UUID PKs):**
   - Planned migration for cloud-native distributed scaling: migrate primary keys from `BIGINT AUTO_INCREMENT` to `UUID` to prevent ID collisions in distributed multi-region sync.
   - PostgreSQL schema definitions for `ssh_key_pairs`, `server_key_assignments`, and `shedlock`.

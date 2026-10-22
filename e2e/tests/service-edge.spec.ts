@@ -73,4 +73,25 @@ test.describe('Service Registry Management — Edge Cases & Boundary Values', ()
     await servicesPage.serviceModal.modal.click({ position: { x: 10, y: 10 } });
     await expect(servicesPage.serviceModal.modal).not.toHaveClass(/active/);
   });
+
+  // Issue #27: Test Health Check URL auto-derivation & custom manual override [Author: Ravindra Singh Pawar / Antigravity]
+  test('should dynamically derive Spring Boot Actuator health URL and allow custom override', async ({ page, servicesPage }) => {
+    await servicesPage.openAddServiceModal();
+
+    const portInput = page.locator('#actuator-port');
+    const ctxInput  = page.locator('#context-path');
+    const healthUrlInput = page.locator('#health-check-url');
+
+    await portInput.fill('8085');
+    await expect(healthUrlInput).toHaveValue(/:8085\/actuator\/health/);
+
+    await ctxInput.fill('payments');
+    await expect(healthUrlInput).toHaveValue(/:8085\/payments\/actuator\/health/);
+
+    // Custom manual override
+    await healthUrlInput.fill('https://custom-domain.internal/healthz');
+    await expect(healthUrlInput).toHaveValue('https://custom-domain.internal/healthz');
+
+    await servicesPage.serviceModal.cancel();
+  });
 });

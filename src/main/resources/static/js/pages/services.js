@@ -14,9 +14,18 @@
 
 // ── All-Services Table View ────────────────────────────────────────────────
 
-function loadAllServicesView() {
+// Issue #27: Load all server service configurations to display live Health Check URLs in Registry [Author: Ravindra Singh Pawar / Antigravity]
+async function loadAllServicesView() {
     const container = $('all-services-table');
     if (!container) return;
+
+    let allConfigs = [];
+    try {
+        allConfigs = unwrap(await apiRequest(API.services.serverServiceConfigsAll, { silent: true })) || [];
+        state.allServerServiceConfigs = allConfigs;
+    } catch {
+        allConfigs = state.allServerServiceConfigs || [];
+    }
 
     const filterServerId = $('service-filter-server')?.value;
     const allServices = [];
@@ -24,7 +33,12 @@ function loadAllServicesView() {
     state.servers.forEach((server) => {
         if (filterServerId && String(server.id) !== filterServerId) return;
         (server.services || []).forEach((service) => {
-            allServices.push({ ...service, server });
+            const config = allConfigs.find((c) => c.serviceId === service.id && c.serverId === server.id);
+            allServices.push({
+                ...service,
+                server,
+                healthCheckUrl: config?.healthCheckUrl || service.healthCheckUrl || '',
+            });
         });
     });
 
@@ -65,6 +79,21 @@ function loadAllServicesView() {
 
 // ── Service Modal ──────────────────────────────────────────────────────────
 
+// Issue #27: Dynamic Actuator base path helper [Author: Ravindra Singh Pawar / Antigravity]
+function syncSpringBootHealthUrl(force = false) {
+    if ($('service-type').value !== 'SPRING_BOOT') return;
+    const urlInput = $('health-check-url');
+    if (!urlInput) return;
+    if (!force && urlInput.dataset.manualEdited === 'true') return;
+
+    const serverId = Number($('service-server').value);
+    const server   = state.servers.find((s) => s.id === serverId) || state.selectedServer;
+    const host     = server?.ipAddress || server?.hostname || '127.0.0.1';
+    const port     = Number($('actuator-port').value || 8080);
+    const ctx      = ($('context-path').value || '').trim().replace(/^\/+|\/+$/g, '');
+    urlInput.value = `http://${host}:${port}${ctx ? `/${ctx}` : ''}/actuator/health`;
+}
+
 async function openServiceModal(id = null) {
     if (!state.selectedServer) return showNotice('Please select a server first.', true);
 
@@ -77,6 +106,11 @@ async function openServiceModal(id = null) {
     $('service-form').reset();
     $('service-id').value     = id || '';
     $('service-server').value = state.selectedServer.id;
+
+    const urlInput = $('health-check-url');
+    if (urlInput) {
+        urlInput.dataset.manualEdited = 'false';
+    }
 
     const service = id ? state.selectedServer.services?.find((s) => s.id === id) : null;
     if (service) {
@@ -94,6 +128,10 @@ async function openServiceModal(id = null) {
         $('scripts-path').value = scriptsPath?.pathDescription || '';
 
         if (healthUrl) {
+            if (urlInput) {
+                urlInput.value = healthUrl;
+                urlInput.dataset.manualEdited = 'true';
+            }
             try {
                 const parsed = new URL(healthUrl);
                 $('actuator-port').value = parsed.port || '80';
@@ -102,11 +140,14 @@ async function openServiceModal(id = null) {
                 $('actuator-port').value = '8080';
                 $('context-path').value  = '';
             }
+        } else {
+            syncSpringBootHealthUrl(true);
         }
     } else {
         $('service-type').value  = 'SPRING_BOOT';
         $('actuator-port').value = '8080';
         $('context-path').value  = '';
+        syncSpringBootHealthUrl(true);
     }
 
     $('spring-boot-fields').style.display = $('service-type').value === 'SPRING_BOOT' ? 'block' : 'none';
@@ -154,7 +195,18 @@ async function deleteService(id) {
 
 function initServicesPage() {
     $('service-type')?.addEventListener('change', (e) => {
-        $('spring-boot-fields').style.display = e.target.value === 'SPRING_BOOT' ? 'block' : 'none';
+        const isSpringBoot = e.target.value === 'SPRING_BOOT';
+        $('spring-boot-fields').style.display = isSpringBoot ? 'block' : 'none';
+        if (isSpringBoot) {
+            syncSpringBootHealthUrl(true);
+        }
+    });
+
+    $('actuator-port')?.addEventListener('input', () => syncSpringBootHealthUrl(false));
+    $('context-path')?.addEventListener('input', () => syncSpringBootHealthUrl(false));
+    $('service-server')?.addEventListener('change', () => syncSpringBootHealthUrl(false));
+    $('health-check-url')?.addEventListener('input', (e) => {
+        e.target.dataset.manualEdited = 'true';
     });
 
     $('service-form')?.addEventListener('submit', async (e) => {
@@ -163,10 +215,10 @@ function initServicesPage() {
         const server   = state.servers.find((s) => s.id === serverId);
         if (!server) return showNotice('Select a valid server.', true);
 
-        const isSpringBoot = $('service-type').value === 'SPRING_BOOT';
-        let healthCheckUrl = '';
-        if (isSpringBoot) {
-            const host = server.ipAddress || server.hostname;
+        // Issue #27: Read configured Health Check URL directly from modal [Author: Ravindra Singh Pawar / Antigravity]
+        let healthCheckUrl = ($('health-check-url')?.value || '').trim();
+        if (!healthCheckUrl && $('service-type').value === 'SPRING_BOOT') {
+            const host = server.ipAddress || server.hostname || '127.0.0.1';
             const port = Number($('actuator-port').value || 8080);
             const ctx  = ($('context-path').value || '').trim().replace(/^\/+|\/+$/g, '');
             healthCheckUrl = `http://${host}:${port}${ctx ? `/${ctx}` : ''}/actuator/health`;
