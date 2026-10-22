@@ -60,6 +60,12 @@
   - Updated Service Registry table in `services.js` to populate the `HEALTH CHECK URL` column with live configuration data across all servers.
   - Updated `dashboard.js` to route live actuator health and version queries through the secure backend proxy (`GET /api/services/runtime-status?url=...`), preventing browser CORS errors.
   - Certified with 6 JUnit 5 unit tests and 27 cross-browser Playwright E2E tests across Chromium, Firefox, and WebKit (+ve & -ve).
+- **Service Registry Live Status & Framework/Type Badges (Issue #28 :white_check_mark:):**
+  - Added `serviceType` to `ServiceResponseDto` with backwards-compatible canonical constructor.
+  - Updated `ServiceMapper` to map `serviceType` bi-directionally between `Service` entity and `ServiceResponseDto`.
+  - Added `.type-badge` styles in `styles.css` for `spring-boot`, `systemd`, and `other`.
+  - Updated `loadAllServicesView()` in `services.js` to render `Type` and live `Status` pill badge columns with pulse dots.
+  - Certified with 7 JUnit 5 unit tests in `ServiceMapperTest` and 30 cross-browser Playwright E2E tests across Chromium, Firefox, and WebKit (+ve & -ve).
 - **Roadmap Target (PostgreSQL & UUID PKs):**
   - Planned migration for cloud-native distributed scaling: migrate primary keys from `BIGINT AUTO_INCREMENT` to `UUID` to prevent ID collisions in distributed multi-region sync.
   - PostgreSQL schema definitions for `ssh_key_pairs`, `server_key_assignments`, and `shedlock`.
