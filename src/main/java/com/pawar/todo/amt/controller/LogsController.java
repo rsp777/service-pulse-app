@@ -54,6 +54,7 @@ public class LogsController {
 		}
 	}
 
+	// Issue #31: Stream service logs over SSE with client disconnect and SSH stream termination [Author: Ravindra Singh Pawar / Antigravity]
 	@CrossOrigin(origins = "*", allowedHeaders = "*")
 	@GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public SseEmitter streamLogsByService(@RequestParam Integer serverId, @RequestParam Integer serviceId) {

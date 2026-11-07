@@ -8,4 +8,24 @@
         <sqlFile path="sql/V1__init.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="false"/>
     </changeSet>
 
+    <!-- Issue #26: Add SSH configuration columns to server table [Author: Ravindra Singh Pawar / Antigravity] -->
+    <changeSet id="2-add-server-ssh-fields" author="Ravindra Singh Pawar / Antigravity" dbms="mysql">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="server" columnName="ssh_port"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="server">
+            <column name="ssh_port" type="INT" defaultValueNumeric="22">
+                <constraints nullable="true"/>
+            </column>
+            <column name="ssh_username" type="VARCHAR(100)" defaultValue="ubuntu">
+                <constraints nullable="true"/>
+            </column>
+            <column name="ssh_key_id" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
 </databaseChangeLog>

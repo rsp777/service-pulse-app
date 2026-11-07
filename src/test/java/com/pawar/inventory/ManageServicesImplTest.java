@@ -3,6 +3,8 @@ package com.pawar.inventory;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,6 +44,18 @@ import com.pawar.todo.amt.ssh.SshCommandService;
 import com.pawar.app.healthcheck.dto.PathResponseDto;
 import com.pawar.app.healthcheck.dto.ScriptResponseDto;
 
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import com.pawar.todo.amt.model.Server;
+import com.pawar.todo.amt.model.Service;
+import com.pawar.todo.amt.model.ServerServiceConfiguration;
+import com.pawar.todo.amt.respository.ServerRepository;
+import com.pawar.todo.amt.respository.ServiceRepository;
+import com.pawar.todo.amt.respository.ServerServiceConfigurationRepository;
+import com.pawar.todo.amt.respository.ServiceHealthStatusRepository;
+import com.pawar.todo.amt.constants.HealthCheckStatus;
+
 @ExtendWith(MockitoExtension.class)
 class ManageServicesImplTest {
 
@@ -58,6 +72,10 @@ class ManageServicesImplTest {
     @Mock private PathService pathService;
     @Mock private AlertConfigurationService alertConfigurationService;
     @Mock private ServiceHealthStatus serviceHealthStatusEntity;
+    @Mock private ServerRepository serverRepository;
+    @Mock private ServiceRepository serviceRepository;
+    @Mock private ServerServiceConfigurationRepository serverServiceConfigurationRepository;
+    @Mock private ServiceHealthStatusRepository serviceHealthStatusRepository;
 
     private ManageServicesImpl manageServices;
     private ServerResponseDto server;
@@ -75,6 +93,10 @@ class ManageServicesImplTest {
         manageServices.setServiceHealthStatusMapper(serviceHealthStatusMapper);
         manageServices.setServiceMapper(serviceMapper);
         manageServices.setPathService(pathService);
+        manageServices.setServerRepository(serverRepository);
+        manageServices.setServiceRepository(serviceRepository);
+        manageServices.setServerServiceConfigurationRepository(serverServiceConfigurationRepository);
+        manageServices.setServiceHealthStatusRepository(serviceHealthStatusRepository);
 
         server = new ServerResponseDto(1, "web-01", "10.0.0.1", "Linux", ServerStatus.ONLINE.toString(),
                 null, null, null, null, null, "test", "test");
@@ -142,5 +164,140 @@ class ManageServicesImplTest {
     private CommandResponseDto command(String name, String parameters) {
         return new CommandResponseDto(3, name, "CheckService", parameters, CommandStatus.CREATED.toString(),
                 null, null, null, "test", "test");
+    }
+
+    // =========================================================================
+    // Issue #30: Tiered Health Evaluation (+ve & -ve) Tests
+    // Author: Ravindra Singh Pawar / Antigravity
+    // =========================================================================
+
+    @Test
+    void isServiceRunningActuatorUpReturnsTrue() throws Exception {
+        String url = "http://localhost:8080/actuator/health";
+        ResponseEntity<String> response = new ResponseEntity<>("{\"status\":\"UP\"}", HttpStatus.OK);
+        when(httpService.restCall(null, url, HttpMethod.GET, null, null)).thenReturn(response);
+
+        assertTrue(manageServices.isServiceRunning(url));
+    }
+
+    @Test
+    void isServiceRunningPlainHttp200ReturnsTrue() throws Exception {
+        String url = "http://localhost:8080/health";
+        ResponseEntity<String> response = new ResponseEntity<>("OK", HttpStatus.OK);
+        when(httpService.restCall(null, url, HttpMethod.GET, null, null)).thenReturn(response);
+
+        assertTrue(manageServices.isServiceRunning(url));
+    }
+
+    @Test
+    void isServiceRunningActuatorDownReturnsFalse() throws Exception {
+        String url = "http://localhost:8080/actuator/health";
+        ResponseEntity<String> response = new ResponseEntity<>("{\"status\":\"DOWN\"}", HttpStatus.OK);
+        when(httpService.restCall(null, url, HttpMethod.GET, null, null)).thenReturn(response);
+
+        assertFalse(manageServices.isServiceRunning(url));
+    }
+
+    @Test
+    void isServiceRunningHttpExceptionReturnsFalse() throws Exception {
+        String url = "http://localhost:8080/actuator/health";
+        when(httpService.restCall(null, url, HttpMethod.GET, null, null)).thenThrow(new RuntimeException("Connection refused"));
+
+        assertFalse(manageServices.isServiceRunning(url));
+    }
+
+    @Test
+    void isServiceRunningFallbackActiveReturnsTrue() throws Exception {
+        when(commandService.findCommand("CheckService")).thenReturn(Optional.empty());
+        when(serverService.findServerById(1)).thenReturn(Optional.of(server));
+        when(sshCommandService.execute(eq(server), contains("systemctl is-active auth-service"))).thenReturn("active\n");
+
+        assertTrue(manageServices.isServiceRunning(1, "auth-service"));
+    }
+
+    @Test
+    void isServiceRunningFallbackInactiveReturnsFalse() throws Exception {
+        when(commandService.findCommand("CheckService")).thenReturn(Optional.empty());
+        when(serverService.findServerById(1)).thenReturn(Optional.of(server));
+        when(sshCommandService.execute(eq(server), contains("systemctl is-active auth-service"))).thenReturn("inactive\n");
+
+        assertFalse(manageServices.isServiceRunning(1, "auth-service"));
+    }
+
+    @Test
+    void evaluateServiceHealthTier1HttpUp() throws Exception {
+        Server serverEntity = new Server();
+        serverEntity.setId(1);
+        serverEntity.setHostname("web-01");
+        serverEntity.setStatus(ServerStatus.ONLINE);
+
+        Service serviceEntity = new Service();
+        serviceEntity.setId(7);
+        serviceEntity.setServiceName("billing");
+
+        ServerServiceConfiguration config = new ServerServiceConfiguration();
+        config.setHealthCheckUrl("http://localhost:8080/actuator/health");
+
+        when(serverServiceConfigurationRepository.findByServerIdAndServiceId(1, 7)).thenReturn(Optional.of(config));
+        when(serviceHealthStatusRepository.findByServiceIdAndServerId(7, 1)).thenReturn(Optional.empty());
+        when(httpService.restCall(null, "http://localhost:8080/actuator/health", HttpMethod.GET, null, null))
+                .thenReturn(new ResponseEntity<>("{\"status\":\"UP\"}", HttpStatus.OK));
+
+        boolean isUp = manageServices.evaluateServiceHealth(serverEntity, serviceEntity);
+
+        assertTrue(isUp);
+        verify(serviceHealthStatusRepository).save(argThat(status -> 
+            status.getStatus() == HealthCheckStatus.UP && "PERIODIC_HEALTH_CHECK".equals(status.getLastUpdatedSource())
+        ));
+    }
+
+    @Test
+    void evaluateServiceHealthTier2FallbackUpWhenUrlIsBlank() throws Exception {
+        Server serverEntity = new Server();
+        serverEntity.setId(1);
+        serverEntity.setHostname("web-01");
+        serverEntity.setStatus(ServerStatus.ONLINE);
+
+        Service serviceEntity = new Service();
+        serviceEntity.setId(7);
+        serviceEntity.setServiceName("auth-service");
+
+        when(serverServiceConfigurationRepository.findByServerIdAndServiceId(1, 7)).thenReturn(Optional.empty());
+        when(serviceHealthStatusRepository.findByServiceIdAndServerId(7, 1)).thenReturn(Optional.empty());
+        when(serverService.findServerById(1)).thenReturn(Optional.of(server));
+        when(commandService.findCommand("CheckService")).thenReturn(Optional.empty());
+        when(sshCommandService.execute(eq(server), contains("systemctl is-active auth-service"))).thenReturn("active\n");
+
+        boolean isUp = manageServices.evaluateServiceHealth(serverEntity, serviceEntity);
+
+        assertTrue(isUp);
+        verify(serviceHealthStatusRepository).save(argThat(status -> 
+            status.getStatus() == HealthCheckStatus.UP && "PERIODIC_HEALTH_CHECK".equals(status.getLastUpdatedSource())
+        ));
+    }
+
+    @Test
+    void evaluateServiceHealthTier2FallbackDownWhenProcessNotRunning() throws Exception {
+        Server serverEntity = new Server();
+        serverEntity.setId(1);
+        serverEntity.setHostname("web-01");
+        serverEntity.setStatus(ServerStatus.ONLINE);
+
+        Service serviceEntity = new Service();
+        serviceEntity.setId(7);
+        serviceEntity.setServiceName("auth-service");
+
+        when(serverServiceConfigurationRepository.findByServerIdAndServiceId(1, 7)).thenReturn(Optional.empty());
+        when(serviceHealthStatusRepository.findByServiceIdAndServerId(7, 1)).thenReturn(Optional.empty());
+        when(serverService.findServerById(1)).thenReturn(Optional.of(server));
+        when(commandService.findCommand("CheckService")).thenReturn(Optional.empty());
+        when(sshCommandService.execute(eq(server), contains("systemctl is-active auth-service"))).thenReturn("inactive\n");
+
+        boolean isUp = manageServices.evaluateServiceHealth(serverEntity, serviceEntity);
+
+        assertFalse(isUp);
+        verify(serviceHealthStatusRepository).save(argThat(status -> 
+            status.getStatus() == HealthCheckStatus.DOWN && "PERIODIC_HEALTH_CHECK".equals(status.getLastUpdatedSource())
+        ));
     }
 }

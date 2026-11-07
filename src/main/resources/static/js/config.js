@@ -31,8 +31,11 @@ function apiUrl(path) {
 /** All known API endpoint paths, grouped by domain. */
 const API = {
     servers: {
-        list:         'api/servers',
-        byId:         (id)         => `api/servers/${id}`,
+        list:           'api/servers',
+        byId:           (id) => `api/servers/${id}`,
+        // Issue #26: Test SSH connection endpoints [Author: Ravindra Singh Pawar / Antigravity]
+        testConnection: 'api/servers/test-connection',
+        testServer:     (id) => `api/servers/${id}/test-connection`,
     },
     services: {
         list:         'api/services',
@@ -46,12 +49,19 @@ const API = {
                         `api/logs/stream?serverId=${serverId}&serviceId=${serviceId}`,
         serverServiceConfigs: (serverId) =>
                         `api/server-service-configurations/server/${serverId}`,
+        // Issue #27: All server configs and runtime status endpoints [Author: Ravindra Singh Pawar / Antigravity]
+        serverServiceConfigsAll: 'api/server-service-configurations',
+        runtimeStatus:           'api/services/runtime-status',
+        // Issue #30: On-demand tiered health evaluation endpoint [Author: Ravindra Singh Pawar / Antigravity]
+        evaluateHealth:          (serverId, serviceId) =>
+                                    `api/manage-services/evaluate-service-health?serverId=${serverId}&serviceId=${serviceId}`,
     },
     commands: {
         list:         'api/commands',
         byId:         (id)         => `api/commands/${id}`,
-        execute:      (serverId, command) =>
-                        `api/commands/execute?serverId=${serverId}&command=${encodeURIComponent(command)}`,
+        // Issue #29: Pass optional commandId to track last run status and execution time [Author: Ravindra Singh Pawar / Antigravity]
+        execute:      (serverId, command, commandId) =>
+                        `api/commands/execute?serverId=${serverId}&command=${encodeURIComponent(command)}${commandId ? `&commandId=${commandId}` : ''}`,
     },
     alerts: {
         list:         'api/alerts',

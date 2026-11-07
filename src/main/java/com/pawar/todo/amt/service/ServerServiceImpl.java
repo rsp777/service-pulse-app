@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.concurrent.ListenableFuture;
 
+import com.pawar.app.healthcheck.dto.ConnectionTestResult;
 import com.pawar.app.healthcheck.dto.ServerRequestDto;
 import com.pawar.app.healthcheck.dto.ServerResponseDto;
 import com.pawar.todo.amt.cache.ServerCache;
@@ -25,6 +26,7 @@ import com.pawar.todo.amt.exceptions.ServerOperationException;
 import com.pawar.todo.amt.mapper.ServerMapper;
 import com.pawar.todo.amt.model.Server;
 import com.pawar.todo.amt.respository.ServerRepository;
+import com.pawar.todo.amt.ssh.SshCommandService;
 import com.pawar.todo.amt.validator.ServerStatusValidator;
 
 
@@ -37,15 +39,18 @@ public class ServerServiceImpl implements ServerService{
     private final ServerMapper serverMapper;
     private final ServerStatusValidator serverStatusValidator;
     private final ServerCache serverCache;
+    private final SshCommandService sshCommandService;
 
 	public ServerServiceImpl(ServerRepository serverRepository,
                         ServerMapper serverMapper,
                         ServerStatusValidator serverStatusValidator,
-                        ServerCache serverCache) {
+                        ServerCache serverCache,
+                        SshCommandService sshCommandService) {
         this.serverRepository = serverRepository;
         this.serverMapper = serverMapper;
         this.serverStatusValidator = serverStatusValidator;
         this.serverCache = serverCache;
+        this.sshCommandService = sshCommandService;
     }
 
 	@Override
@@ -56,6 +61,10 @@ public class ServerServiceImpl implements ServerService{
             validateServerRequest(serverRequestDto);
             
             Server server = serverMapper.toEntity(serverRequestDto);
+            // Issue #26: Default status to UNKNOWN if not provided [Author: Ravindra Singh Pawar / Antigravity]
+            if (server.getStatus() == null) {
+                server.setStatus(ServerStatus.UNKNOWN);
+            }
             server.setCreatedDttm(LocalDateTime.now());
             server.setLastUpdatedDttm(LocalDateTime.now());
             
@@ -194,5 +203,35 @@ public class ServerServiceImpl implements ServerService{
         if (serverRepository.existsByIpAddress(dto.ipAddress())) {
             throw new ResourceAlreadyExistsException("Server with IP address '" + dto.ipAddress() + "' already exists");
         }
+    }
+
+    // Issue #26: Test SSH connectivity to target server [Author: Ravindra Singh Pawar / Antigravity]
+    @Override
+    public ConnectionTestResult testConnection(ServerRequestDto serverRequestDto) {
+        ServerResponseDto dto = new ServerResponseDto(
+                serverRequestDto.id(),
+                serverRequestDto.hostname(),
+                serverRequestDto.ipAddress(),
+                serverRequestDto.osType(),
+                serverRequestDto.status() != null ? serverRequestDto.status() : "UNKNOWN",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                serverRequestDto.sshPort() != null ? serverRequestDto.sshPort() : 22,
+                serverRequestDto.sshUsername() != null && !serverRequestDto.sshUsername().isBlank() ? serverRequestDto.sshUsername().trim() : "ubuntu",
+                serverRequestDto.sshKeyId()
+        );
+        return sshCommandService.testConnection(dto);
+    }
+
+    @Override
+    public ConnectionTestResult testConnection(Integer serverId) throws ServerOperationException {
+        ServerResponseDto dto = findServerById(serverId)
+                .orElseThrow(() -> new ServerOperationException("Server not found with ID: " + serverId));
+        return sshCommandService.testConnection(dto);
     }
 }

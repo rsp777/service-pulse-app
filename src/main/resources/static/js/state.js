@@ -39,3 +39,9 @@ const state = {
 let logStreamSource         = null;
 let serviceActionStreamSource = null;
 let systemLogStreamSource   = null;
+
+Object.defineProperty(window, 'logStreamSource', {
+    get() { return logStreamSource; },
+    set(v) { logStreamSource = v; },
+    configurable: true
+});

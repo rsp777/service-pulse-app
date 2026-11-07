@@ -219,6 +219,58 @@ public class ServerController {
         }
     }
 
+    // Issue #26: Test SSH connection from form data [Author: Ravindra Singh Pawar / Antigravity]
+    @PostMapping("/test-connection")
+    public ResponseEntity<ApiResponse<com.pawar.app.healthcheck.dto.ConnectionTestResult>> testConnection(
+            @RequestBody ServerRequestDto serverRequest) {
+        logger.debug("Entering testConnection() with request: {}", serverRequest);
+        try {
+            com.pawar.app.healthcheck.dto.ConnectionTestResult result = serverService.testConnection(serverRequest);
+            return ResponseEntity.ok(
+                new ApiResponse<>(
+                    result.connected(),
+                    result.message(),
+                    result
+                )
+            );
+        } catch (Exception e) {
+            logger.error("Error testing connection: {}", e.getMessage(), e);
+            return ResponseEntity.ok(
+                new ApiResponse<>(
+                    false,
+                    "Connection test failed: " + e.getMessage(),
+                    new com.pawar.app.healthcheck.dto.ConnectionTestResult(false, e.getMessage())
+                )
+            );
+        }
+    }
+
+    // Issue #26: Test SSH connection for existing saved server [Author: Ravindra Singh Pawar / Antigravity]
+    @PostMapping("/{id}/test-connection")
+    public ResponseEntity<ApiResponse<com.pawar.app.healthcheck.dto.ConnectionTestResult>> testConnectionForServer(
+            @PathVariable Integer id) {
+        logger.debug("Entering testConnectionForServer() for ID: {}", id);
+        try {
+            com.pawar.app.healthcheck.dto.ConnectionTestResult result = serverService.testConnection(id);
+            return ResponseEntity.ok(
+                new ApiResponse<>(
+                    result.connected(),
+                    result.message(),
+                    result
+                )
+            );
+        } catch (Exception e) {
+            logger.error("Error testing connection for server ID {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.ok(
+                new ApiResponse<>(
+                    false,
+                    "Connection test failed: " + e.getMessage(),
+                    new com.pawar.app.healthcheck.dto.ConnectionTestResult(false, e.getMessage())
+                )
+            );
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteServer(@PathVariable Integer id) {
         logger.debug("Entering deleteServer() for ID: {}", id);

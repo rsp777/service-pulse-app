@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>com.pawar.amt</groupId>
 	<artifactId>service-pulse-app</artifactId>
-	<version>0.0.28</version>
+	<version>0.0.29-SNAPSHOT</version>
 	<name>service-pulse-app</name>
 	<description>service-pulse-app</description>
 	<properties>
@@ -152,7 +152,19 @@
 		<dependency>
 			<groupId>jakarta.validation</groupId>
 			<artifactId>jakarta.validation-api</artifactId>
-			<version>3.1.1</version>
+			<version>3.0.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<version>1.19.3</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>1.19.3</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 	<dependencyManagement>
@@ -195,6 +207,14 @@
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.2.5</version>
+				<configuration>
+					<argLine>-XX:+EnableDynamicAgentLoading</argLine>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>3.3.0</version>
 				<configuration>
@@ -223,4 +243,104 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<profile>
+			<id>windows</id>
+			<activation>
+				<os>
+					<family>windows</family>
+				</os>
+			</activation>
+			<properties>
+				<npm.executable>npm.cmd</npm.executable>
+				<npx.executable>npx.cmd</npx.executable>
+			</properties>
+		</profile>
+		<profile>
+			<id>unix</id>
+			<activation>
+				<os>
+					<family>unix</family>
+				</os>
+			</activation>
+			<properties>
+				<npm.executable>npm</npm.executable>
+				<npx.executable>npx</npx.executable>
+			</properties>
+		</profile>
+		<profile>
+			<id>e2e-install</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>exec-maven-plugin</artifactId>
+						<version>3.1.1</version>
+						<executions>
+							<execution>
+								<id>npm-install</id>
+								<phase>test</phase>
+								<goals>
+									<goal>exec</goal>
+								</goals>
+								<configuration>
+									<executable>${npm.executable}</executable>
+									<arguments>
+										<argument>install</argument>
+									</arguments>
+									<workingDirectory>${project.basedir}/e2e</workingDirectory>
+								</configuration>
+							</execution>
+							<execution>
+								<id>playwright-install-browsers</id>
+								<phase>test</phase>
+								<goals>
+									<goal>exec</goal>
+								</goals>
+								<configuration>
+									<executable>${npx.executable}</executable>
+									<arguments>
+										<argument>playwright</argument>
+										<argument>install</argument>
+										<argument>--with-deps</argument>
+										<argument>chromium</argument>
+									</arguments>
+									<workingDirectory>${project.basedir}/e2e</workingDirectory>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
+			<id>e2e</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>exec-maven-plugin</artifactId>
+						<version>3.1.1</version>
+						<executions>
+							<execution>
+								<id>playwright-e2e-tests</id>
+								<phase>test</phase>
+								<goals>
+									<goal>exec</goal>
+								</goals>
+								<configuration>
+									<executable>${npm.executable}</executable>
+									<arguments>
+										<argument>test</argument>
+									</arguments>
+									<workingDirectory>${project.basedir}/e2e</workingDirectory>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>

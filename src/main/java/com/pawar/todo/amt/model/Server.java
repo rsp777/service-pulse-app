@@ -51,6 +51,19 @@ public class Server {
 	@Column(name = "status")
 	private ServerStatus status;
 
+	// Issue #26: SSH Port, Username, and KeyId configuration [Author: Ravindra Singh Pawar / Antigravity]
+	@JsonProperty("sshPort")
+	@Column(name = "ssh_port")
+	private Integer sshPort = 22;
+
+	@JsonProperty("sshUsername")
+	@Column(name = "ssh_username")
+	private String sshUsername = "ubuntu";
+
+	@JsonProperty("sshKeyId")
+	@Column(name = "ssh_key_id")
+	private String sshKeyId;
+
 	@JsonInclude(value = Include.CUSTOM)
 	@JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
 	@JsonProperty("lastHealthChecked")

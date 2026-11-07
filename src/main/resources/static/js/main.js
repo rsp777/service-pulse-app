@@ -25,15 +25,20 @@
 'use strict';
 
 // ── Global Modal Behavior ─────────────────────────────────────────────────
+// Issue #31: Ensure closing logs modal terminates stream and cleans up resources [Author: Ravindra Singh Pawar / Antigravity]
 
 function initModalDismissal() {
     // Dismiss via data-close button
     document.querySelectorAll('[data-close]').forEach((btn) => {
         btn.onclick = () => {
             const modalId = btn.dataset.close;
-            if (modalId === 'logs-modal' && logStreamSource) {
-                logStreamSource.close();
-                logStreamSource = null;
+            if (modalId === 'logs-modal') {
+                if (typeof closeServiceLogsModal === 'function') {
+                    closeServiceLogsModal();
+                } else if (logStreamSource) {
+                    logStreamSource.close();
+                    logStreamSource = null;
+                }
             }
             const modal = $(modalId);
             if (modal) modal.classList.remove('active');
@@ -44,9 +49,13 @@ function initModalDismissal() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             document.querySelectorAll('.modal.active').forEach((modal) => {
-                if (modal.id === 'logs-modal' && logStreamSource) {
-                    logStreamSource.close();
-                    logStreamSource = null;
+                if (modal.id === 'logs-modal') {
+                    if (typeof closeServiceLogsModal === 'function') {
+                        closeServiceLogsModal();
+                    } else if (logStreamSource) {
+                        logStreamSource.close();
+                        logStreamSource = null;
+                    }
                 }
                 modal.classList.remove('active');
             });
@@ -58,9 +67,13 @@ function initModalDismissal() {
     document.querySelectorAll('.modal').forEach((modal) => {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                if (modal.id === 'logs-modal' && logStreamSource) {
-                    logStreamSource.close();
-                    logStreamSource = null;
+                if (modal.id === 'logs-modal') {
+                    if (typeof closeServiceLogsModal === 'function') {
+                        closeServiceLogsModal();
+                    } else if (logStreamSource) {
+                        logStreamSource.close();
+                        logStreamSource = null;
+                    }
                 }
                 modal.classList.remove('active');
             }
@@ -84,6 +97,9 @@ async function bootstrapApp() {
     initSettingsPage();
     initCommandExecutionPanel();
     initTerminalControls();
+    if (typeof initServiceLogsModalControls === 'function') {
+        initServiceLogsModalControls();
+    }
     initBulkServiceButtons();
 
     // 3. Routing

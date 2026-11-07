@@ -32,6 +32,15 @@ public class ServerServiceConfigurationController {
         this.serviceHealthStatusRepository = serviceHealthStatusRepository;
     }
 
+    // Issue #27: Endpoint to list all server service configurations across all servers [Author: Ravindra Singh Pawar / Antigravity]
+    @GetMapping
+    public ResponseEntity<List<ServerServiceConfigurationResponse>> findAll() {
+        List<ServerServiceConfigurationResponse> configurations = repository.findAll().stream()
+                .map(this::toResponse)
+                .toList();
+        return ResponseEntity.ok(configurations);
+    }
+
     @GetMapping("/server/{serverId}")
     public ResponseEntity<List<ServerServiceConfigurationResponse>> findByServer(@PathVariable Integer serverId) {
         List<ServerServiceConfigurationResponse> configurations = repository.findByServerId(serverId).stream()

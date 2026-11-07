@@ -47,6 +47,7 @@ import com.pawar.todo.amt.model.Command;
 import com.pawar.todo.amt.model.Server;
 import com.pawar.todo.amt.model.ServiceHealthStatus;
 import com.pawar.todo.amt.respository.ServiceRepository;
+import com.pawar.todo.amt.respository.ServerRepository;
 import com.pawar.todo.amt.respository.ServiceHealthStatusRepository;
 import com.pawar.todo.amt.respository.ServerServiceConfigurationRepository;
 import com.pawar.todo.amt.respository.ApplicationConfigurationRepository;
@@ -68,6 +69,7 @@ public class ManageServicesImpl implements ManageServices {
 	private final ScriptExtensionConverter scriptExtensionConverter;
 	private ServiceHealthStatusMapper serviceHealthStatusMapper;
 	private ServiceMapper serviceMapper;
+	private ServerMapper serverMapper;
 	private final HttpService httpService;
 	private final AlertConfigurationService alertConfigurationService;
 
@@ -75,6 +77,9 @@ public class ManageServicesImpl implements ManageServices {
 
 	@Autowired
 	private ServiceRepository serviceRepository;
+
+	@Autowired
+	private ServerRepository serverRepository;
 
 	@Value("${healthcheck.enabled:true}")
 	private boolean healthCheckEnabled = true;
@@ -139,7 +144,32 @@ public class ManageServicesImpl implements ManageServices {
 	@Autowired
 	public void setServiceMapper(ServiceMapper serviceMapper) {
 		this.serviceMapper = serviceMapper;
+	}
 
+	@Autowired
+	public void setServerMapper(ServerMapper serverMapper) {
+		this.serverMapper = serverMapper;
+	}
+
+	@Autowired
+	public void setServerRepository(ServerRepository serverRepository) {
+		this.serverRepository = serverRepository;
+	}
+
+	@Autowired
+	public void setServiceRepository(ServiceRepository serviceRepository) {
+		this.serviceRepository = serviceRepository;
+	}
+
+	@Autowired
+	public void setServiceHealthStatusRepository(ServiceHealthStatusRepository serviceHealthStatusRepository) {
+		this.serviceHealthStatusRepository = serviceHealthStatusRepository;
+	}
+
+	@Autowired
+	public void setServerServiceConfigurationRepository(
+			ServerServiceConfigurationRepository serverServiceConfigurationRepository) {
+		this.serverServiceConfigurationRepository = serverServiceConfigurationRepository;
 	}
 
 	@Override
@@ -367,25 +397,40 @@ public class ManageServicesImpl implements ManageServices {
 		}
 	}
 
+	// Issue #30: Robust process/systemd check with fallback [Author: Ravindra Singh Pawar / Antigravity]
 	public boolean isServiceRunning(Integer serverId, String serviceName) {
 		try {
+			String isServiceRunningCmd = null;
+			try {
+				if (commandService != null) {
+					Optional<CommandResponseDto> commandResponseDto = commandService.findCommand("CheckService");
+					if (commandResponseDto.isPresent()) {
+						CommandResponseDto cmd = commandResponseDto.get();
+						String params = cmd.parameters() != null ? cmd.parameters().trim() : "";
+						isServiceRunningCmd = (cmd.name() + " " + params + " " + serviceName).trim();
+					}
+				}
+			} catch (Exception e) {
+				log.debug("CheckService command lookup failed, using fallback: {}", e.getMessage());
+			}
 
-			CommandResponseDto commandResponseDto = commandService.findCommand("CheckService")
-					.orElseThrow(() -> new ServiceOperationException("Command does not exist"));
+			if (isServiceRunningCmd == null || isServiceRunningCmd.isBlank()) {
+				// Issue #30: Fallback to process/systemd status verification (systemctl is-active or pgrep -f) [Author: Ravindra Singh Pawar / Antigravity]
+				isServiceRunningCmd = String.format(
+						"systemctl is-active %1$s 2>/dev/null || systemctl is-active %1$s.service 2>/dev/null || (pgrep -f %1$s >/dev/null && echo \"active\") || echo \"inactive\"",
+						serviceName);
+			}
 
-			String isServiceRunningCmd = commandResponseDto.name() + " " + commandResponseDto.parameters() + " "
-					+ serviceName;
 			log.info("isServiceRunningCmd : {}", isServiceRunningCmd);
 			ServerResponseDto server = getServer(serverId);
 			String response = sshCommandService.execute(server, isServiceRunningCmd).trim().toLowerCase();
 			log.info("Service: {}, Response: {}", serviceName, response);
 			return response.equals("active") || response.equals("running") || response.equals("up")
-					|| response.contains(" active ") || response.startsWith("active ");
+					|| response.contains(" active ") || response.startsWith("active ") || response.endsWith(" active");
 		} catch (Exception e) {
-			log.error("Error during service health check", e);
+			log.error("Error during service health check for service {} on serverId {}", serviceName, serverId, e);
 		}
 		return false;
-
 	}
 
 	// Method to update health status for all services
@@ -413,6 +458,104 @@ public class ManageServicesImpl implements ManageServices {
 				"SERVICE_MANAGEMENT", "SERVICE_MANAGEMENT"));
 	}
 
+	// Issue #30: Tiered health evaluation (Tier 1: HTTP/Actuator URL, Tier 2: Host process/systemd probe) [Author: Ravindra Singh Pawar / Antigravity]
+	public boolean evaluateServiceHealth(Server server, com.pawar.todo.amt.model.Service existingService) {
+		Optional<String> configuredHealthCheckUrl = serverServiceConfigurationRepository != null
+				? serverServiceConfigurationRepository.findByServerIdAndServiceId(server.getId(), existingService.getId())
+						.map(configuration -> configuration.getHealthCheckUrl())
+				: Optional.empty();
+
+		ServiceHealthStatus healthStatus = serviceHealthStatusRepository != null
+				? serviceHealthStatusRepository.findByServiceIdAndServerId(existingService.getId(), server.getId())
+						.orElseGet(ServiceHealthStatus::new)
+				: new ServiceHealthStatus();
+		healthStatus.setService(existingService);
+		healthStatus.setServer(server);
+		boolean hadActiveAlert = alertConfigurationService != null
+				&& alertConfigurationService.hasActiveAlert(server.getId(), existingService.getId());
+
+		long healthCheckStarted = System.nanoTime();
+		boolean serviceUp = false;
+
+		// Tier 1: Probe HTTP endpoint if Health Check URL is configured and non-blank
+		if (configuredHealthCheckUrl.isPresent() && !configuredHealthCheckUrl.get().isBlank()) {
+			serviceUp = isServiceRunning(configuredHealthCheckUrl.get());
+		} else {
+			// Tier 2: Fallback to process/systemd status verification on target host so active services are not falsely marked DOWN
+			try {
+				ServerResponseDto serverDto = getServer(server.getId());
+				if (ServerStatus.ONLINE.toString().equalsIgnoreCase(serverDto.status())) {
+					serviceUp = isServiceRunning(server.getId(), existingService.getServiceName());
+				} else {
+					log.debug("Skipping host probe for service {} because server {} is OFFLINE",
+							existingService.getServiceName(), server.getHostname());
+					serviceUp = false;
+				}
+			} catch (Exception ex) {
+				log.warn("Failed to probe host process status for service {} on server {}: {}",
+						existingService.getServiceName(), server.getHostname(), ex.getMessage());
+				serviceUp = false;
+			}
+		}
+		healthStatus.setResponseTime((System.nanoTime() - healthCheckStarted) / 1_000_000);
+
+		if (serviceUp) {
+			if (hadActiveAlert) {
+				log.info("Service recovered: serverId={}, serviceId={} is now UP (closing alert)",
+						server.getId(), existingService.getId());
+			} else {
+				log.info("Health check completed: serverId={}, serviceId={}, status=UP",
+						server.getId(), existingService.getId());
+			}
+		} else {
+			if (!hadActiveAlert) {
+				log.warn("Health check failed: serverId={}, serviceId={}, status=DOWN (triggering alert)",
+						server.getId(), existingService.getId());
+			} else {
+				log.debug("Health check: serverId={}, serviceId={} still DOWN (alert already active)",
+						server.getId(), existingService.getId());
+			}
+		}
+
+		healthStatus.setStatus(serviceUp ? HealthCheckStatus.UP : HealthCheckStatus.DOWN);
+		healthStatus.setTimestamp(LocalDateTime.now());
+		healthStatus.setLastUpdatedDttm(LocalDateTime.now());
+		healthStatus.setLastUpdatedSource("PERIODIC_HEALTH_CHECK");
+		if (serviceHealthStatusRepository != null) {
+			serviceHealthStatusRepository.save(healthStatus);
+		}
+		if (runtimeFlag("alert-management.enabled", true) && alertConfigurationService != null) {
+			log.info("Triggering alert evaluation for serverId={}, serviceId={},status={}, responseTime={}",
+					server.getId(), existingService.getId(), healthStatus.getStatus().name(),
+					healthStatus.getResponseTime());
+			alertConfigurationService.evaluate(server.getId(), existingService.getId(),
+					healthStatus.getStatus().name(), healthStatus.getResponseTime());
+		}
+		return serviceUp;
+	}
+
+	@Override
+	@Transactional
+	public boolean evaluateServiceHealth(Integer serverId, Integer serviceId)
+			throws ServerOperationException, ResourceNotFoundException {
+		Server server = (serverRepository != null ? serverRepository.findById(serverId) : Optional.<Server>empty())
+				.orElseGet(() -> {
+					try {
+						ServerResponseDto dto = getServer(serverId);
+						if (serverMapper != null) return serverMapper.toEntity(dto);
+					} catch (Exception ignored) {}
+					return null;
+				});
+		if (server == null) {
+			throw new ServerOperationException("Server does not exist: " + serverId);
+		}
+		com.pawar.todo.amt.model.Service service = (serviceRepository != null
+				? serviceRepository.findById(serviceId)
+				: Optional.<com.pawar.todo.amt.model.Service>empty())
+				.orElseThrow(() -> new ResourceNotFoundException("Service not found with ID: " + serviceId));
+		return evaluateServiceHealth(server, service);
+	}
+
 	@Override
 	@Async
 	@Scheduled(cron = "${healthcheck.cron}")
@@ -429,74 +572,32 @@ public class ManageServicesImpl implements ManageServices {
 						.orElseThrow(() -> new ResourceNotFoundException(
 								"Service not found with ID: " + serviceResponseDto.id()));
 				for (Server server : Optional.ofNullable(existingService.getServers()).orElse(Set.of())) {
-					Optional<String> configuredHealthCheckUrl = serverServiceConfigurationRepository
-							.findByServerIdAndServiceId(server.getId(), existingService.getId())
-							.map(configuration -> configuration.getHealthCheckUrl());
-					if (configuredHealthCheckUrl.isEmpty() || configuredHealthCheckUrl.get().isBlank()) {
-						log.warn(
-								"Skipping health check: no server-specific URL configured for serverId={}, serviceId={}",
-								server.getId(), existingService.getId());
-						continue;
-					}
-					ServiceHealthStatus healthStatus = serviceHealthStatusRepository
-							.findByServiceIdAndServerId(existingService.getId(), server.getId())
-							.orElseGet(ServiceHealthStatus::new);
-					healthStatus.setService(existingService);
-					healthStatus.setServer(server);
-					boolean hadActiveAlert = alertConfigurationService.hasActiveAlert(server.getId(),
-							existingService.getId());
-					long healthCheckStarted = System.nanoTime();
-					boolean serviceUp = isServiceRunning(configuredHealthCheckUrl.get());
-					healthStatus.setResponseTime((System.nanoTime() - healthCheckStarted) / 1_000_000);
-
-					if (serviceUp) {
-						if (hadActiveAlert) {
-							log.info("Service recovered: serverId={}, serviceId={} is now UP (closing alert)",
-									server.getId(), existingService.getId());
-						} else {
-							log.info("Health check completed: serverId={}, serviceId={}, status=UP",
-									server.getId(), existingService.getId());
-						}
-					} else {
-						if (!hadActiveAlert) {
-							log.warn("Health check failed: serverId={}, serviceId={}, status=DOWN (triggering alert)",
-									server.getId(), existingService.getId());
-						} else {
-							log.debug("Health check: serverId={}, serviceId={} still DOWN (alert already active)",
-									server.getId(), existingService.getId());
-						}
-					}
-
-					healthStatus.setStatus(serviceUp ? HealthCheckStatus.UP : HealthCheckStatus.DOWN);
-					healthStatus.setTimestamp(LocalDateTime.now());
-					healthStatus.setLastUpdatedDttm(LocalDateTime.now());
-					healthStatus.setLastUpdatedSource("PERIODIC_HEALTH_CHECK");
-					serviceHealthStatusRepository.save(healthStatus);
-					if (runtimeFlag("alert-management.enabled", true)) {
-						log.info("Triggering alert evaluation for serverId={}, serviceId={},status={}, responseTime={}",server.getId(), existingService.getId(), healthStatus.getStatus().name(), healthStatus.getResponseTime());
-						alertConfigurationService.evaluate(server.getId(), existingService.getId(), healthStatus.getStatus().name(), healthStatus.getResponseTime());
-					}
+					evaluateServiceHealth(server, existingService);
 				}
 			}
 		} catch (Exception e) {
 			log.error("Error during periodic service health status check", e);
 		}
-
 	}
 
+	// Issue #30: Robust HTTP / Spring Actuator health probe [Author: Ravindra Singh Pawar / Antigravity]
 	public boolean isServiceRunning(String healthCheckUrl) {
 		boolean isServiceRunning = false;
 		try {
 			ResponseEntity<String> response = httpService.restCall(null, healthCheckUrl, HttpMethod.GET, null, null);
-			if (response != null && response.getStatusCode().equals(HttpStatus.OK)) {
-				isServiceRunning = true;
+			if (response != null && (response.getStatusCode().is2xxSuccessful() || response.getStatusCode().equals(HttpStatus.OK))) {
+				String body = response.getBody();
+				if (body != null && body.contains("\"status\"")) {
+					isServiceRunning = body.toUpperCase().matches("(?s).*\"STATUS\"\\s*:\\s*\"UP\".*");
+				} else {
+					isServiceRunning = true;
+				}
 			}
 		} catch (Exception e) {
 			log.debug("Service health check request failed for {}: {}", healthCheckUrl, e.getMessage());
 		}
 
 		return isServiceRunning;
-
 	}
 
 	private boolean runtimeFlag(String key, boolean fallback) {

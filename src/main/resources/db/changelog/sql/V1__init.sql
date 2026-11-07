@@ -1,3 +1,132 @@
+-- Baseline Core Entities
+CREATE TABLE IF NOT EXISTS server (
+    server_id INT NOT NULL AUTO_INCREMENT,
+    hostname VARCHAR(255) NULL,
+    ipAddress VARCHAR(255) NULL,
+    osType VARCHAR(255) NULL,
+    status VARCHAR(50) NULL,
+    lastHealthChecked DATETIME NULL,
+    created_dttm DATETIME NULL,
+    last_updated_dttm DATETIME NULL,
+    created_source VARCHAR(255) NULL,
+    last_updated_source VARCHAR(255) NULL,
+    PRIMARY KEY (server_id)
+);
+
+CREATE TABLE IF NOT EXISTS service (
+    service_id INT NOT NULL AUTO_INCREMENT,
+    serviceName VARCHAR(255) NULL,
+    service_type VARCHAR(255) NULL,
+    created_dttm DATETIME NULL,
+    last_updated_dttm DATETIME NULL,
+    created_source VARCHAR(255) NULL,
+    last_updated_source VARCHAR(255) NULL,
+    PRIMARY KEY (service_id)
+);
+
+CREATE TABLE IF NOT EXISTS server_service (
+    server_id INT NOT NULL,
+    service_id INT NOT NULL,
+    PRIMARY KEY (server_id, service_id),
+    CONSTRAINT fk_server_service_server FOREIGN KEY (server_id) REFERENCES server (server_id) ON DELETE CASCADE,
+    CONSTRAINT fk_server_service_service FOREIGN KEY (service_id) REFERENCES service (service_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS path (
+    path_id INT NOT NULL AUTO_INCREMENT,
+    pathName VARCHAR(255) NULL,
+    pathDescription VARCHAR(500) NULL,
+    createdDttm DATETIME NULL,
+    lastUpdatedDttm DATETIME NULL,
+    createdSource VARCHAR(255) NULL,
+    lastUpdatedSource VARCHAR(255) NULL,
+    PRIMARY KEY (path_id)
+);
+
+CREATE TABLE IF NOT EXISTS script (
+    script_id INT NOT NULL AUTO_INCREMENT,
+    scriptName VARCHAR(255) NULL,
+    scriptExtension VARCHAR(50) NULL,
+    createdDttm DATETIME NULL,
+    lastUpdatedDttm DATETIME NULL,
+    createdSource VARCHAR(255) NULL,
+    lastUpdatedSource VARCHAR(255) NULL,
+    PRIMARY KEY (script_id)
+);
+
+CREATE TABLE IF NOT EXISTS server_path (
+    server_id INT NOT NULL,
+    path_id INT NOT NULL,
+    PRIMARY KEY (server_id, path_id),
+    CONSTRAINT fk_server_path_server FOREIGN KEY (server_id) REFERENCES server (server_id) ON DELETE CASCADE,
+    CONSTRAINT fk_server_path_path FOREIGN KEY (path_id) REFERENCES path (path_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS path_script (
+    path_id INT NOT NULL,
+    script_id INT NOT NULL,
+    PRIMARY KEY (path_id, script_id),
+    CONSTRAINT fk_path_script_path FOREIGN KEY (path_id) REFERENCES path (path_id) ON DELETE CASCADE,
+    CONSTRAINT fk_path_script_script FOREIGN KEY (script_id) REFERENCES script (script_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS command (
+    command_id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    description VARCHAR(500) NULL,
+    parameters TEXT NULL,
+    status VARCHAR(50) NOT NULL,
+    result VARCHAR(500) NULL,
+    execution_time BIGINT NULL,
+    error_message VARCHAR(500) NULL,
+    created_dttm DATETIME NULL,
+    last_updated_dttm DATETIME NULL,
+    created_source VARCHAR(255) NULL,
+    last_updated_source VARCHAR(255) NULL,
+    PRIMARY KEY (command_id)
+);
+
+CREATE TABLE IF NOT EXISTS http_methods (
+    httpMethodsId INT NOT NULL AUTO_INCREMENT,
+    methodName VARCHAR(50) NULL,
+    allowedInHealthCheck BOOLEAN NOT NULL DEFAULT FALSE,
+    createdDttm DATETIME NULL,
+    lastUpdatedDttm DATETIME NULL,
+    PRIMARY KEY (httpMethodsId)
+);
+
+CREATE TABLE IF NOT EXISTS health_check (
+    health_check_id INT NOT NULL AUTO_INCREMENT,
+    url VARCHAR(255) NULL,
+    operationalPort INT NULL,
+    httpMethodsId INT NULL,
+    expectedResponse VARCHAR(255) NULL,
+    service_id INT NULL,
+    createdDttm DATETIME NULL,
+    lastUpdatedDttm DATETIME NULL,
+    PRIMARY KEY (health_check_id),
+    CONSTRAINT fk_health_check_service FOREIGN KEY (service_id) REFERENCES service (service_id) ON DELETE SET NULL,
+    CONSTRAINT fk_health_check_http_method FOREIGN KEY (httpMethodsId) REFERENCES http_methods (httpMethodsId) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS service_health_status (
+    health_status_id INT NOT NULL AUTO_INCREMENT,
+    service_id INT NOT NULL,
+    server_id INT NULL,
+    status VARCHAR(50) NOT NULL,
+    timestamp DATETIME NOT NULL,
+    response_time BIGINT NULL,
+    error_message VARCHAR(500) NULL,
+    created_dttm DATETIME NULL,
+    last_updated_dttm DATETIME NULL,
+    created_source VARCHAR(255) NULL,
+    last_updated_source VARCHAR(255) NULL,
+    PRIMARY KEY (health_status_id),
+    UNIQUE KEY uq_service_health_server (server_id, service_id),
+    CONSTRAINT fk_health_status_service FOREIGN KEY (service_id) REFERENCES service (service_id) ON DELETE CASCADE,
+    CONSTRAINT fk_health_status_server FOREIGN KEY (server_id) REFERENCES server (server_id) ON DELETE CASCADE
+);
+
 -- Source: V2__server_service_configuration.sql
 -- Service Pulse database migration
 CREATE TABLE IF NOT EXISTS application_configuration (
@@ -20,24 +149,25 @@ CREATE TABLE IF NOT EXISTS server_service_configuration (
     UNIQUE KEY uq_server_service_configuration (server_id, service_id)
 );
 
+SET @table_exists = (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'service_health_status');
 SET @column_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'service_health_status' AND column_name = 'server_id');
-SET @sql = IF(@column_exists = 0, 'ALTER TABLE service_health_status ADD COLUMN server_id INT NULL', 'SELECT 1');
+SET @sql = IF(@table_exists = 1 AND @column_exists = 0, 'ALTER TABLE service_health_status ADD COLUMN server_id INT NULL', 'SELECT 1');
 PREPARE add_server_id FROM @sql; EXECUTE add_server_id; DEALLOCATE PREPARE add_server_id;
 
 SET @index_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'service_health_status' AND index_name = 'uq_service_health_server');
-SET @sql = IF(@index_exists = 0, 'ALTER TABLE service_health_status ADD UNIQUE KEY uq_service_health_server (server_id, service_id)', 'SELECT 1');
+SET @sql = IF(@table_exists = 1 AND @index_exists = 0, 'ALTER TABLE service_health_status ADD UNIQUE KEY uq_service_health_server (server_id, service_id)', 'SELECT 1');
 PREPARE add_health_index FROM @sql; EXECUTE add_health_index; DEALLOCATE PREPARE add_health_index;
 
+SET @service_table_exists = (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'service');
 SET @legacy_url_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'service' AND column_name = 'healthCheckUrl');
-SET @sql = IF(@legacy_url_exists = 1, 'INSERT INTO server_service_configuration (server_id, service_id, health_check_url, created_dttm, last_updated_dttm, created_source, last_updated_source) SELECT ss.server_id, ss.service_id, s.healthCheckUrl, NOW(), NOW(), ''DATABASE_MIGRATION'', ''DATABASE_MIGRATION'' FROM server_service ss JOIN service s ON s.service_id = ss.service_id WHERE s.healthCheckUrl IS NOT NULL AND NOT EXISTS (SELECT 1 FROM server_service_configuration existing WHERE existing.server_id = ss.server_id AND existing.service_id = ss.service_id)', 'SELECT 1');
+SET @sql = IF(@service_table_exists = 1 AND @legacy_url_exists = 1, 'INSERT INTO server_service_configuration (server_id, service_id, health_check_url, created_dttm, last_updated_dttm, created_source, last_updated_source) SELECT ss.server_id, ss.service_id, s.healthCheckUrl, NOW(), NOW(), ''DATABASE_MIGRATION'', ''DATABASE_MIGRATION'' FROM server_service ss JOIN service s ON s.service_id = ss.service_id WHERE s.healthCheckUrl IS NOT NULL AND NOT EXISTS (SELECT 1 FROM server_service_configuration existing WHERE existing.server_id = ss.server_id AND existing.service_id = ss.service_id)', 'SELECT 1');
 PREPARE migrate_service_urls FROM @sql; EXECUTE migrate_service_urls; DEALLOCATE PREPARE migrate_service_urls;
 
 INSERT INTO application_configuration (configuration_key, configuration_value, last_updated_dttm)
 VALUES ('healthcheck.enabled', 'true', NOW()), ('service-management.enabled', 'true', NOW())
 ON DUPLICATE KEY UPDATE configuration_value = configuration_value;
 
-SET @legacy_url_exists = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'service' AND column_name = 'healthCheckUrl');
-SET @sql = IF(@legacy_url_exists = 1, 'ALTER TABLE service DROP COLUMN healthCheckUrl', 'SELECT 1');
+SET @sql = IF(@service_table_exists = 1 AND @legacy_url_exists = 1, 'ALTER TABLE service DROP COLUMN healthCheckUrl', 'SELECT 1');
 PREPARE drop_legacy_url FROM @sql; EXECUTE drop_legacy_url; DEALLOCATE PREPARE drop_legacy_url;
 
 
