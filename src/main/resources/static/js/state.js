@@ -14,6 +14,8 @@ const state = {
     // Domain data
     servers:                    [],
     selectedServer:             null,
+    // Issue #32: Version asynchronous host selections, including reselecting the same host.
+    serverSelection:            0,
     commands:                   [],
     paths:                      [],
     scripts:                    [],
