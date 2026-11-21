@@ -33,6 +33,8 @@ const API = {
     servers: {
         list:           'api/servers',
         byId:           (id) => `api/servers/${id}`,
+        // Issue #33: Read-only telemetry for a registered host.
+        metrics:        (id) => `api/servers/${id}/metrics`,
         // Issue #26: Test SSH connection endpoints [Author: Ravindra Singh Pawar / Antigravity]
         testConnection: 'api/servers/test-connection',
         testServer:     (id) => `api/servers/${id}/test-connection`,

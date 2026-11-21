@@ -109,6 +109,8 @@ async function bootstrapApp() {
     await loadServers();
     await loadCommands();
     await loadAlertsData();
+    // Issue #34: Poll independently of subsequent page navigation.
+    startNotificationPolling();
 }
 
 // Kick off when DOM is ready

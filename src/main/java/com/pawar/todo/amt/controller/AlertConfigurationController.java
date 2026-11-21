@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -29,6 +30,12 @@ public class AlertConfigurationController {
     private final AlertConfigurationService service;
 
     public AlertConfigurationController(AlertConfigurationService service) { this.service = service; }
+
+    // Issue #34: Rule validation failures are client errors, not successful saves or HTTP 500.
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<String>> invalidRule(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest().body(new ApiResponse<>(false, exception.getMessage(), null));
+    }
 
     @GetMapping
     public List<AlertConfigurationResponse> findAll() { return service.findAll().stream().map(this::toResponse).toList(); }
