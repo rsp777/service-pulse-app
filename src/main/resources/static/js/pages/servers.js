@@ -110,6 +110,14 @@ function renderServersTable() {
 async function selectServer(id) {
     // Issue #33: Reset telemetry immediately when the target changes.
     selectHostMetrics(id);
+    // Issue #32: Clear old controls synchronously and discard stale host responses.
+    const selection = ++state.serverSelection;
+    state.healthStatuses = {};
+    state.serverServiceConfigurations = [];
+    if ($('service-list')) $('service-list').innerHTML = '<div class="empty-state">Loading services...</div>';
+    ['start-all-services', 'stop-all-services', 'restart-all-services'].forEach(buttonId => {
+        if ($(buttonId)) $(buttonId).hidden = true;
+    });
     if (!id) {
         state.selectedServer = null;
         if ($('server-select')) $('server-select').value = '';
@@ -141,15 +149,19 @@ async function selectServer(id) {
 
     try {
         const persisted = unwrap(await apiRequest(API.services.healthStatus(id), { silent: true })) || [];
+        if (selection !== state.serverSelection) return;
         state.healthStatuses = Object.fromEntries(persisted.map((item) => [item.service?.id, item.status]));
     } catch {
+        if (selection !== state.serverSelection) return;
         state.healthStatuses = {};
     }
 
     try {
-        state.serverServiceConfigurations =
-            unwrap(await apiRequest(API.services.serverServiceConfigs(id), { silent: true })) || [];
+        const configurations = unwrap(await apiRequest(API.services.serverServiceConfigs(id), { silent: true })) || [];
+        if (selection !== state.serverSelection) return;
+        state.serverServiceConfigurations = configurations;
     } catch {
+        if (selection !== state.serverSelection) return;
         state.serverServiceConfigurations = [];
     }
 
