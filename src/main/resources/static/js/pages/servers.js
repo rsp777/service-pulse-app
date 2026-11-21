@@ -108,11 +108,13 @@ function renderServersTable() {
 // ── Server Selection ──────────────────────────────────────────────────────
 
 async function selectServer(id) {
+    // Issue #33: Reset telemetry immediately when the target changes.
+    selectHostMetrics(id);
     if (!id) {
         state.selectedServer = null;
         if ($('server-select')) $('server-select').value = '';
         if ($('command-target-server')) $('command-target-server').value = '';
-        if ($('selected-title')) $('selected-title').textContent = 'Select a server';
+        if ($('selected-title')) $('selected-title').textContent = 'Active server';
         if ($('selected-meta')) $('selected-meta').textContent  = 'Choose a server to view and control its services.';
         if ($('service-list'))  $('service-list').innerHTML     = '<div class="empty-state">Select a server to load services.</div>';
         return;
@@ -127,7 +129,7 @@ async function selectServer(id) {
     if ($('command-target-server')) $('command-target-server').value = server.id;
 
     if ($('selected-title')) {
-        $('selected-title').textContent = server.hostname || server.ipAddress;
+        $('selected-title').textContent = 'Active server';
     }
     if ($('selected-meta')) {
         $('selected-meta').innerHTML =

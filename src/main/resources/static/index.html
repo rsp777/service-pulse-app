@@ -120,7 +120,8 @@
                 <div class="grid">
                     <article class="card">
                         <div class="card-title-bar">
-                            <h3 id="selected-title">Select a server</h3>
+                            <!-- Issue #33: The selector is the single host identity in this card. -->
+                            <h3 id="selected-title">Active server</h3>
                             <button class="btn btn-sm" id="add-server">+ Add server</button>
                         </div>
                         <p id="selected-meta" style="color: var(--muted); margin-bottom: 16px;">
@@ -133,12 +134,13 @@
                     
 
                         <!-- Metrics Display (Read-only, aligned under server-select) -->
-                        <div id="server-metrics-display" style="margin-top: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 12px; color: var(--muted); display: none;">
+                        <div id="server-metrics-display" style="margin-top: 16px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 12px; color: var(--muted);" aria-live="polite">
                             <div style="font-weight: bold; margin-bottom: 6px; color: var(--text); border-bottom: 1px solid var(--line); padding-bottom: 6px;">Server Metrics</div>
-                            <div id="metrics-cpu-percent">CPU: Calculating...</div>
-                            <div id="metrics-mem-percent">Memory: Calculating...</div>
-                            <div id="metrics-disk-percent">Disk: Calculating...</div>
-                            <div id="metrics-disk-free" style="margin-top: 6px; font-size: 11px;">Free: Calculating...</div>
+                            <div id="metrics-cpu-percent">CPU: —</div>
+                            <div id="metrics-mem-percent">Memory: —</div>
+                            <div id="metrics-disk-percent">Disk (/): —</div>
+                            <div id="metrics-uptime">Uptime: —</div>
+                            <div id="metrics-status" role="status">Select a server to view metrics.</div>
                         </div>
 
                     </article>
@@ -753,6 +755,7 @@
 
     <!-- Page Modules -->
     <script src="js/pages/servers.js"></script>
+    <script src="js/pages/metrics.js"></script>
     <script src="js/pages/dashboard.js"></script>
     <script src="js/pages/services.js"></script>
     <script src="js/pages/commands.js"></script>
