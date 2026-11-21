@@ -14,14 +14,50 @@
 
 'use strict';
 
+// Issue #34: Notifications refresh on every page; newer responses supersede stale ones.
+let notificationTimer = null;
+let notificationVersion = 0;
+let notificationStopped = false;
+
+async function refreshNotifications() {
+    const version = ++notificationVersion;
+    try {
+        const unread = unwrap(await apiRequest(API.alerts.events.unread, { silent: true })) || [];
+        if (version !== notificationVersion || notificationStopped) return;
+        state.unreadAlerts = unread;
+        updateNotificationBell();
+        updateDashboardStats();
+    } catch {
+        // Preserve the last good unread state during a transient outage.
+    }
+}
+
+function startNotificationPolling() {
+    clearTimeout(notificationTimer);
+    notificationStopped = false;
+    async function poll() {
+        await refreshNotifications();
+        if (!notificationStopped) notificationTimer = setTimeout(poll, 10000);
+    }
+    notificationTimer = setTimeout(poll, 10000);
+}
+
+window.addEventListener('pagehide', () => {
+    notificationStopped = true;
+    ++notificationVersion;
+    clearTimeout(notificationTimer);
+});
+window.addEventListener('pageshow', event => {
+    if (event.persisted) startNotificationPolling();
+});
+
 // ── Data Loading ──────────────────────────────────────────────────────────
 
 async function loadAlertsData() {
     try {
         state.alerts       = await apiRequest(API.alerts.list, { silent: true }) || [];
         state.alertEvents  = await apiRequest(API.alerts.events.list, { silent: true }) || [];
-        state.unreadAlerts = await apiRequest(API.alerts.events.unread, { silent: true }) || [];
-        updateNotificationBell();
+        await refreshNotifications();
 
         if (state.activeAlertTab === 'rules') renderAlertRules();
         else if (state.activeAlertTab === 'events') renderAlertEvents();
@@ -254,6 +290,24 @@ function toggleAlertTargetFields() {
     const isServer = $('alert-target-type').value === 'SERVER';
     $('alert-server-group').style.display  = isServer ? 'block' : 'none';
     $('alert-service-group').style.display = !isServer ? 'block' : 'none';
+    // Issue #34: Offer conditions that the selected scope can actually evaluate.
+    const condition = $('alert-condition-type');
+    Array.from(condition.options).forEach(option => {
+        const hostCondition = ['SERVER_STATUS', 'RESOURCE_USAGE'].includes(option.value);
+        option.disabled = hostCondition !== isServer;
+    });
+    if (condition.selectedOptions[0]?.disabled) condition.value = isServer ? 'SERVER_STATUS' : 'SERVICE_STATUS';
+    updateAlertConditionHelp();
+}
+
+function updateAlertConditionHelp() {
+    const resource = $('alert-condition-type').value === 'RESOURCE_USAGE';
+    $('alert-condition-value').placeholder = resource ? 'CPU:80, MEMORY:85 or DISK:90' : 'OFFLINE, UP or response time in ms';
+    const status = ['SERVER_STATUS', 'SERVICE_STATUS', 'STATUS'].includes($('alert-condition-type').value);
+    Array.from($('alert-operator').options).forEach(option => {
+        option.disabled = status && ['GREATER_THAN', 'LESS_THAN'].includes(option.value);
+    });
+    if ($('alert-operator').selectedOptions[0]?.disabled) $('alert-operator').value = 'EQUALS';
 }
 
 function openAlertModal(id = null) {
@@ -330,12 +384,15 @@ function initAlertsPage() {
     });
 
     $('alert-target-type')?.addEventListener('change', toggleAlertTargetFields);
+    $('alert-condition-type')?.addEventListener('change', updateAlertConditionHelp);
 
     // Alert Rule Form
     $('alert-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const id       = $('alert-id').value;
         const isServer = $('alert-target-type').value === 'SERVER';
+        const targetId = Number($(isServer ? 'alert-server' : 'alert-service').value);
+        if (!targetId) return showNotice('Select a valid alert target.', true);
 
         const payload = {
             name:           $('alert-name').value.trim(),

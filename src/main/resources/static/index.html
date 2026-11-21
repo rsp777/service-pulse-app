@@ -566,8 +566,10 @@
                     <div>
                         <label for="alert-condition-type">Condition Type</label>
                         <select id="alert-condition-type">
+                            <!-- Issue #34: Host reachability and percentage thresholds are evaluated by the scheduler. -->
+                            <option value="SERVER_STATUS">SERVER_STATUS</option>
                             <option value="SERVICE_STATUS">SERVICE_STATUS</option>
-                            <option value="HTTP_STATUS">HTTP_STATUS</option>
+                            <option value="STATUS">STATUS (legacy)</option>
                             <option value="RESPONSE_TIME">RESPONSE_TIME</option>
                             <option value="RESOURCE_USAGE">RESOURCE_USAGE</option>
                         </select>
