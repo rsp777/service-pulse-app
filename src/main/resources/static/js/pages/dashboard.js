@@ -43,13 +43,18 @@ function getServiceHealthUrl(service) {
 
 async function loadServices() {
     if (!state.selectedServer) return;
+    // Issue #32: Health and action controls belong to one specific host selection.
+    const server = state.selectedServer;
+    const selection = state.serverSelection;
     try {
-        const persisted = unwrap(await apiRequest(API.services.healthStatus(state.selectedServer.id), { silent: true })) || [];
+        const persisted = unwrap(await apiRequest(API.services.healthStatus(server.id), { silent: true })) || [];
+        if (selection !== state.serverSelection) return;
         state.healthStatuses = Object.fromEntries(persisted.map((item) => [item.service?.id, item.status]));
     } catch {
         // preserve existing state.healthStatuses
     }
-    const services    = state.selectedServer.services || [];
+    if (selection !== state.serverSelection) return;
+    const services    = server.services || [];
     const hasMultiple = services.length > 1;
 
     ['start-all-services', 'stop-all-services', 'restart-all-services'].forEach((id) => {
@@ -70,7 +75,7 @@ async function loadServices() {
         const statusVal  = state.healthStatuses[service.id] || 'UNKNOWN';
         const statusClass = statusVal === 'UP' ? 'online' : statusVal === 'DOWN' ? 'offline' : 'unknown';
         return `
-            <div class="service-row" data-service-id="${service.id}">
+            <div class="service-row" data-service-id="${service.id}" data-server-id="${server.id}">
                 <div class="service-info">
                     <strong>${escapeHtml(service.serviceName)}</strong>
                     <small>Health URL: ${escapeHtml(healthUrl || 'Not configured')}</small>
@@ -96,7 +101,7 @@ async function loadServices() {
         btn.onclick = () => {
             const action    = btn.dataset.serviceAction;
             const serviceId = Number(btn.closest('[data-service-id]').dataset.serviceId);
-            serviceAction(action, serviceId);
+            serviceAction(action, serviceId, server.id);
         };
     });
     container.querySelectorAll('[data-service-edit]').forEach((btn) => {
@@ -106,60 +111,65 @@ async function loadServices() {
         btn.onclick = () => deleteService(Number(btn.dataset.serviceDelete));
     });
 
-    services.forEach((s) => updateServiceRuntime(s));
+    services.forEach((s) => updateServiceRuntime(s, selection));
 }
 
-// Issue #27: Proxied runtime status endpoint for robust Actuator parsing [Author: Ravindra Singh Pawar / Antigravity]
-async function updateServiceRuntime(service) {
-    const healthUrl = getServiceHealthUrl(service);
-    const versionEl   = $(`version-${service.id}`);
-    const indicatorEl = $(`indicator-${service.id}`);
+// Issue #32: Keep UNKNOWN distinct and update all lifecycle controls consistently.
+function applyServiceState(serviceId, status) {
+    const value = String(status || 'UNKNOWN').toUpperCase();
+    const up = value === 'UP' || value === 'ONLINE';
+    const down = value === 'DOWN' || value === 'OFFLINE';
+    const row = document.querySelector(`[data-service-id="${serviceId}"]`);
+    if (!row) return;
+    const indicator = row.querySelector('.status');
+    if (indicator) {
+        indicator.className = `status ${up ? 'online' : down ? 'offline' : 'unknown'}`;
+        indicator.innerHTML = `<span class="pulse-dot"></span>${escapeHtml(value)}`;
+    }
+    ['start', 'stop', 'restart'].forEach(action => {
+        const button = row.querySelector(`[data-service-action="${action}"]`);
+        button.disabled = action === 'start' ? up : down;
+        button.title = button.disabled ? (up ? 'Service is already running' : 'Service is already stopped') : '';
+    });
+}
 
-    // Issue #30: If health check URL is unconfigured, synchronize indicator with persisted host health status [Author: Ravindra Singh Pawar / Antigravity]
+async function updateServiceRuntime(service, selection = state.serverSelection) {
+    const healthUrl = getServiceHealthUrl(service);
+    applyServiceState(service.id, state.healthStatuses[service.id]);
+    const versionEl = $(`version-${service.id}`);
     if (!healthUrl) {
         if (versionEl) versionEl.textContent = '—';
-        const persisted = state.healthStatuses[service.id];
-        if (indicatorEl && persisted) {
-            const isOnline = persisted === 'ONLINE' || persisted === 'UP';
-            indicatorEl.className = `status ${isOnline ? 'online' : 'offline'}`;
-            indicatorEl.innerHTML = `<span class="pulse-dot"></span>${escapeHtml(persisted)}`;
-        }
         return;
     }
-
     try {
         const res = await apiRequest(`${API.services.runtimeStatus}?url=${encodeURIComponent(healthUrl)}`, { silent: true });
-        if (res && res.status) {
-            if (indicatorEl) {
-                const isOnline = res.status === 'ONLINE' || res.status === 'UP';
-                indicatorEl.className = `status ${isOnline ? 'online' : 'offline'}`;
-                indicatorEl.innerHTML = `<span class="pulse-dot"></span>${isOnline ? 'ONLINE' : 'OFFLINE'}`;
-            }
-            if (versionEl) {
-                versionEl.textContent = res.version || 'Unknown';
-            }
-        }
+        if (selection !== state.serverSelection) return;
+        applyServiceState(service.id, res?.status || state.healthStatuses[service.id]);
+        if (versionEl) versionEl.textContent = res?.version || 'Unknown';
     } catch {
-        const persisted = state.healthStatuses[service.id];
-        if (indicatorEl && persisted) {
-            const isOnline = persisted === 'ONLINE' || persisted === 'UP';
-            indicatorEl.className = `status ${isOnline ? 'online' : 'offline'}`;
-            indicatorEl.innerHTML = `<span class="pulse-dot"></span>${escapeHtml(persisted)}`;
-        }
+        if (selection !== state.serverSelection) return;
+        applyServiceState(service.id, state.healthStatuses[service.id]);
     }
 }
 
-// ── Service Actions ────────────────────────────────────────────────────────
+// Service actions
 
-async function serviceAction(action, serviceId) {
+async function serviceAction(action, serviceId, serverId = state.selectedServer?.id) {
+    if (!serverId || serverId !== state.selectedServer?.id) return;
     if (action === 'logs') {
         streamServiceLogs(serviceId);
         return;
     }
 
+    // Issue #32: Confirm the service and host before destructive actions.
+    const server = state.selectedServer;
+    const service = server.services?.find(s => s.id === serviceId);
+    if (!service) return;
+    if (['stop', 'restart'].includes(action) &&
+        !window.confirm(`${action === 'stop' ? 'Stop' : 'Restart'} "${service.serviceName}" on ${server.hostname || server.ipAddress}?`)) return;
     showNotice(`Executing ${action} on service #${serviceId}...`);
     try {
-        const res        = await apiRequest(API.services.execute(action, state.selectedServer.id, serviceId), { method: 'POST' });
+        const res        = await apiRequest(API.services.execute(action, serverId, serviceId), { method: 'POST' });
         const data       = unwrap(res);
         const outputText = typeof data === 'object'
             ? (data.output || data.payload?.output || JSON.stringify(data, null, 2))
@@ -169,7 +179,7 @@ async function serviceAction(action, serviceId) {
         if (terminal) terminal.textContent = outputText.replace(/\\n/g, '\n').replace(/\\r/g, '');
 
         showNotice(`${action} completed successfully.`);
-        await selectServer(state.selectedServer.id);
+        if (state.selectedServer?.id === serverId) await selectServer(serverId);
     } catch (err) {
         showNotice(`Service ${action} failed: ${err.message}`, true);
     }
@@ -392,6 +402,9 @@ Object.defineProperty(window, 'serviceLogBuffer', {
 async function bulkServiceAction(action) {
     if (!state.selectedServer) return showNotice('Select a server first.', true);
     const serverId = state.selectedServer.id;
+    // Issue #32: Confirm before opening the SSE request that starts a bulk operation.
+    if (['stop', 'restart'].includes(action) &&
+        !window.confirm(`${action === 'stop' ? 'Stop' : 'Restart'} ALL services on ${state.selectedServer.hostname || state.selectedServer.ipAddress}?`)) return;
 
     if (serviceActionStreamSource) { serviceActionStreamSource.close(); serviceActionStreamSource = null; }
 
@@ -407,7 +420,7 @@ async function bulkServiceAction(action) {
     serviceActionStreamSource.addEventListener('complete', async () => {
         if (serviceActionStreamSource) { serviceActionStreamSource.close(); serviceActionStreamSource = null; }
         terminal.textContent += `\n[${action.toUpperCase()} ALL COMPLETED]\n`;
-        await selectServer(serverId);
+        if (state.selectedServer?.id === serverId) await selectServer(serverId);
         showNotice(`${action} all services completed.`);
     });
     serviceActionStreamSource.onerror = () => {
